@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 
 //! Hexponent
 //!
@@ -140,6 +140,7 @@ fn consume_hex_digits(data: &[u8]) -> (&[u8], &[u8]) {
     data.split_at(i)
 }
 
+/// Parse a slice of bytes into a `Float`.
 pub fn parse_float(data: &[u8]) -> Result<Float, Box<dyn Error>> {
     let (is_positive, data) = consume_sign(data);
 
