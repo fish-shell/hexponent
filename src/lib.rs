@@ -5,8 +5,7 @@
 //!
 //! This crate is used for parsing hexadecimal floating-point literals.
 
-use std::convert::TryInto;
-use std::error::Error;
+use std::fmt;
 
 fn hex_digit_to_int(digit: u8) -> Option<u8> {
     match digit {
@@ -42,10 +41,8 @@ pub struct Float {
     exponent: i32,
 }
 
-impl TryInto<f32> for Float {
-    type Error = Box<dyn Error>;
-
-    fn try_into(self) -> Result<f32, Box<dyn Error>> {
+impl Into<f32> for Float {
+    fn into(self) -> f32 {
         // This code should work for arbitrary values of the following
         // constants
         const EXPONENT_BITS: u32 = 8;
@@ -64,7 +61,7 @@ impl TryInto<f32> for Float {
 
         // If there were all
         if digits.is_empty() {
-            return Ok(0.0);
+            return 0.0;
         }
 
         // This code is a work of art.
@@ -89,17 +86,17 @@ impl TryInto<f32> for Float {
         if final_exponent < std::f32::MIN_EXP - 1 {
             // TODO: Add a warning for underflow.
             // TODO: Implement subnormal numbers.
-            return Ok(if self.is_positive { 0.0 } else { -0.0 });
+            return if self.is_positive { 0.0 } else { -0.0 };
         }
 
         // Check for overflows
         if final_exponent > std::f32::MAX_EXP {
             // TODO: Add a warning for overflow.
-            return Ok(if self.is_positive {
+            return if self.is_positive {
                 std::f32::INFINITY
             } else {
                 std::f32::NEG_INFINITY
-            });
+            };
         }
 
         let exponent_result: u32 =
@@ -107,9 +104,9 @@ impl TryInto<f32> for Float {
 
         let sign_result: u32 = (!self.is_positive as u32) << (MANTISSA_BITS + EXPONENT_BITS);
 
-        Ok(f32::from_bits(
+        f32::from_bits(
             sign_result | exponent_result | mantissa_result,
-        ))
+        )
 
         // // This might be a bit faster.
         // let mut final_result = !self.is_positive as u32;
@@ -138,16 +135,55 @@ fn consume_hex_digits(data: &[u8]) -> (&[u8], &[u8]) {
     data.split_at(i)
 }
 
+/// Error type for parsing hexadecimal literals.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ParseError {
+    /// No prefix was found. Hexadecimal literals must start with a "0x" or "0X"
+    /// prefix.
+    MissingPrefix,
+    /// No digits were found. Hexadecimals literals must have digits before or
+    /// after the decimal point.
+    MissingDigits,
+    /// Hexadecimal literals with a "p" or "P" to indicate an exponent must have
+    /// an exponent.
+    MissingExponent,
+    /// The exponent of a hexidecimal literal must fit into a signed 32-bit
+    /// integer.
+    ExponentOverflow,
+    /// Extra bytes were found at the end of the hexadecimal literal.
+    ExtraData,
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ParseError::MissingPrefix => write!(f, "literal must have hex prefix"),
+            ParseError::MissingDigits => write!(f, "literal must have digits"),
+            ParseError::MissingExponent => write!(f, "exponent not present"),
+            ParseError::ExponentOverflow => write!(f, "exponent too large to fit in integer"),
+            ParseError::ExtraData => {
+                write!(f, "extra bytes were found at the end of float literal")
+            }
+        }
+    }
+}
+
+impl From<std::num::ParseIntError> for ParseError {
+    fn from(_error: std::num::ParseIntError) -> ParseError {
+        ParseError::ExponentOverflow
+    }
+}
+
 /// Parse a slice of bytes into a `Float`.
 ///
 /// This is based on hexadecimal floating constants in the C11 specification,
 /// section [6.4.4.2](http://port70.net/~nsz/c/c11/n1570.html#6.4.4.2).
-pub fn parse_float(data: &[u8]) -> Result<Float, Box<dyn Error>> {
+pub fn parse_float(data: &[u8]) -> Result<Float, ParseError> {
     let (is_positive, data) = consume_sign(data);
 
     let data = match data.get(0..2) {
         Some(b"0X") | Some(b"0x") => &data[2..],
-        _ => return Err("Literal must begin with '0x'".into()),
+        _ => return Err(ParseError::MissingPrefix),
     };
 
     let (ipart, data) = consume_hex_digits(data);
@@ -161,7 +197,7 @@ pub fn parse_float(data: &[u8]) -> Result<Float, Box<dyn Error>> {
 
     // Must have digits before or after the decimal point.
     if fpart.is_empty() && ipart.is_empty() {
-        return Err("Not enough digits.".into());
+        return Err(ParseError::MissingDigits);
     }
 
     // Trim leading zeros.
@@ -196,7 +232,7 @@ pub fn parse_float(data: &[u8]) -> Result<Float, Box<dyn Error>> {
                 .unwrap_or_else(|| data[sign_offset..].len());
 
             if exponent_digits_offset == 0 {
-                return Err("Exponent mut have digits.".into());
+                return Err(ParseError::MissingExponent);
             }
 
             // The exponent should always contain valid utf-8 beacuse it
@@ -211,7 +247,7 @@ pub fn parse_float(data: &[u8]) -> Result<Float, Box<dyn Error>> {
     };
 
     if !data.is_empty() {
-        return Err("Extra bytes at end of float".into());
+        return Err(ParseError::ExtraData);
     }
 
     Ok(Float {

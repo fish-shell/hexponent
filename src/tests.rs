@@ -1,5 +1,4 @@
-use crate::parse_float;
-use std::convert::TryInto;
+use crate::{parse_float, ParseError};
 
 // This macros serves two functions:
 // 1. It avoids the float_cmp clippy lint
@@ -25,14 +24,14 @@ right: `{:?}` (`{:08x}`)"#,
 
 fn test_float(s: &str, result: f32) {
     let float_repr = parse_float(s.as_ref()).unwrap();
-    let float_result: f32 = float_repr.try_into().unwrap();
+    let float_result: f32 = float_repr.into();
     assert_eq_float!(float_result, result);
 }
 
 // TODO: Once I switch to typed errors, convert this to a macro that accepts
 // a pattern to make sure it returns the correct error.
-fn test_parse_error(s: &str) {
-    assert!(parse_float(s.as_ref()).is_err());
+fn test_parse_error(s: &str, error: ParseError) {
+    assert_eq!(parse_float(s.as_ref()).unwrap_err(), error);
 }
 
 // // There are no conversion errors yet.
@@ -117,17 +116,20 @@ fn rcc_tests() {
 
 #[test]
 fn test_incomplete() {
-    test_parse_error("");
-    test_parse_error("-");
-    test_parse_error("+");
-    test_parse_error("-3.2");
-    test_parse_error("0x");
-    test_parse_error("-0x");
-    test_parse_error("+0x");
-    test_parse_error("0x.");
-    test_parse_error("0xp");
-    test_parse_error("0x.p1");
-    test_parse_error("0x1p");
-    test_parse_error("0x1p+");
-    test_parse_error("0x1p-");
+    test_parse_error("", ParseError::MissingPrefix);
+    test_parse_error("-", ParseError::MissingPrefix);
+    test_parse_error("+", ParseError::MissingPrefix);
+    test_parse_error("-3.2", ParseError::MissingPrefix);
+    test_parse_error("0x", ParseError::MissingDigits);
+    test_parse_error("-0x", ParseError::MissingDigits);
+    test_parse_error("+0x", ParseError::MissingDigits);
+    test_parse_error("0x.", ParseError::MissingDigits);
+    test_parse_error("0xp", ParseError::MissingDigits);
+    test_parse_error("0x.p1", ParseError::MissingDigits);
+    test_parse_error("0x1p", ParseError::MissingExponent);
+    test_parse_error("0x1p+", ParseError::MissingExponent);
+    test_parse_error("0x1p-", ParseError::MissingExponent);
+    test_parse_error("0x1p10000000000", ParseError::ExponentOverflow);
+    test_parse_error("0x1p-10000000000", ParseError::ExponentOverflow);
+    test_parse_error("0xbaddata", ParseError::ExtraData);
 }
