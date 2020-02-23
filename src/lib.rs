@@ -104,9 +104,7 @@ impl Into<f32> for Float {
 
         let sign_result: u32 = (!self.is_positive as u32) << (MANTISSA_BITS + EXPONENT_BITS);
 
-        f32::from_bits(
-            sign_result | exponent_result | mantissa_result,
-        )
+        f32::from_bits(sign_result | exponent_result | mantissa_result)
 
         // // This might be a bit faster.
         // let mut final_result = !self.is_positive as u32;
@@ -115,14 +113,6 @@ impl Into<f32> for Float {
         // final_result <<= MANTISSA_BITS;
         // final_result |= mantissa_result;
         // f32::from_bits(final_result)
-    }
-}
-
-fn consume_sign(data: &[u8]) -> (bool, &[u8]) {
-    match data.get(0) {
-        Some(b'+') => (true, &data[1..]),
-        Some(b'-') => (false, &data[1..]),
-        _ => (true, data),
     }
 }
 
@@ -179,7 +169,11 @@ impl From<std::num::ParseIntError> for ParseError {
 /// This is based on hexadecimal floating constants in the C11 specification,
 /// section [6.4.4.2](http://port70.net/~nsz/c/c11/n1570.html#6.4.4.2).
 pub fn parse_float(data: &[u8]) -> Result<Float, ParseError> {
-    let (is_positive, data) = consume_sign(data);
+    let (is_positive, data) = match data.get(0) {
+        Some(b'+') => (true, &data[1..]),
+        Some(b'-') => (false, &data[1..]),
+        _ => (true, data),
+    };
 
     let data = match data.get(0..2) {
         Some(b"0X") | Some(b"0x") => &data[2..],
