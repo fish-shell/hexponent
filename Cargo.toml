@@ -3,6 +3,7 @@ name = "hexponent"
 version = "0.1.0"
 authors = ["Graham Scheaffer <me@gisch.dev>"]
 edition = "2018"
+license = "MIT/Apache-2.0"
 description = "Hexadecimal float parsing"
 repository = "https://gitlab.com/pythondude325/hexponent"
 documentation = "https://docs.rs/hexponent"
