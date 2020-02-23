@@ -1,5 +1,5 @@
-use std::convert::TryInto;
 use crate::parse_float;
+use std::convert::TryInto;
 
 // This macros serves two functions:
 // 1. It avoids the float_cmp clippy lint
@@ -93,4 +93,3 @@ fn test_overflow_underflow() {
     test_float("0x1p-1000", 0.0);
     test_float("-0x1p-1000", -0.0);
 }
-
