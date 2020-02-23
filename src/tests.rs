@@ -65,17 +65,17 @@ fn test_exponents() {
     test_float("0x10", 16.0);
     test_float("0x100", 256.0);
 
-    test_float("0x1p-2", 0.003_906_25);
-    test_float("0x1p-1", 0.0625);
+    test_float("0x1p-8", 0.003_906_25);
+    test_float("0x1p-4", 0.0625);
     test_float("0x1p0", 1.0);
-    test_float("0x1p1", 16.0);
-    test_float("0x1p2", 256.0);
+    test_float("0x1p4", 16.0);
+    test_float("0x1p8", 256.0);
 
-    test_float("0x0.01p2", 1.0);
-    test_float("0x0.1p1", 1.0);
+    test_float("0x0.01p8", 1.0);
+    test_float("0x0.1p4", 1.0);
     test_float("0x1p0", 1.0);
-    test_float("0x10p-1", 1.0);
-    test_float("0x100p-2", 1.0);
+    test_float("0x10p-4", 1.0);
+    test_float("0x100p-8", 1.0);
 }
 
 #[test]
@@ -86,10 +86,18 @@ fn test_overflow_underflow() {
     // These two are technically wrong, but are correct enough. They should
     // acually return subnormal numbers, but i have not implemented that
     // yet.
-    test_float("0x1p-26", 0.0);
-    test_float("-0x1p-26", -0.0);
+    test_float("0x1p-128", 0.0);
+    test_float("-0x1p-128", -0.0);
 
     // These acually should underflow to zero.
     test_float("0x1p-1000", 0.0);
     test_float("-0x1p-1000", -0.0);
+}
+
+#[test]
+fn rcc_tests() {
+    test_float("0x.ep0", 0.875);
+    test_float("0x.ep-0", 0.875);
+    test_float("0xe.p-4", 0.875);
+    test_float("0xep-4", 0.875);
 }

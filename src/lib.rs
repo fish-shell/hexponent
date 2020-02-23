@@ -83,9 +83,7 @@ impl TryInto<f32> for Float {
         mantissa_result <<= leading_zeros + 1;
         mantissa_result >>= 32 - MANTISSA_BITS;
 
-        // Multiply self.exponent by four because it is the base-16 exponent.
-        // It needs to be in base-2. 16^x = 2^4x
-        let final_exponent = exponent_offset + 4 * self.exponent;
+        let final_exponent = exponent_offset + self.exponent;
 
         // Check for underflows
         if final_exponent < std::f32::MIN_EXP - 1 {
@@ -141,6 +139,9 @@ fn consume_hex_digits(data: &[u8]) -> (&[u8], &[u8]) {
 }
 
 /// Parse a slice of bytes into a `Float`.
+///
+/// This is based on hexadecimal floating constants in the C11 specification,
+/// section [6.4.4.2](http://port70.net/~nsz/c/c11/n1570.html#6.4.4.2).
 pub fn parse_float(data: &[u8]) -> Result<Float, Box<dyn Error>> {
     let (is_positive, data) = consume_sign(data);
 
@@ -181,30 +182,35 @@ pub fn parse_float(data: &[u8]) -> Result<Float, Box<dyn Error>> {
         Some(b'P') | Some(b'p') => {
             let data = &data[1..];
 
-            let (is_positive, data) = consume_sign(data);
-            let (hex_digits, data) = consume_hex_digits(data);
+            let sign_offset = match data.get(0) {
+                Some(b'+') | Some(b'-') => 1,
+                _ => 0,
+            };
 
-            if hex_digits.is_empty() {
+            let exponent_digits_offset = data[sign_offset..]
+                .iter()
+                .position(|&b| match b {
+                    b'0'..=b'9' => false,
+                    _ => true,
+                })
+                .unwrap_or_else(|| data[sign_offset..].len());
+
+            if exponent_digits_offset == 0 {
                 return Err("Exponent mut have digits.".into());
             }
 
-            let mut value: i32 = 0;
-            for digit in hex_digits {
-                value <<= 4;
-                // This unwrap should be safe because consume_hex_digits ensures
-                // valid hex digits are present.
-                value |= hex_digit_to_int(*digit).unwrap() as i32;
-            }
+            // The exponent should always contain valid utf-8 beacuse it
+            // consumes a sign, and base-10 digits.
+            let exponent: i32 = std::str::from_utf8(&data[..sign_offset + exponent_digits_offset])
+                .expect("exponent did not contain valid utf-8")
+                .parse()?;
 
-            let signum = if is_positive { 1 } else { -1 };
-
-            (value * signum, data)
+            (exponent, &data[sign_offset + exponent_digits_offset..])
         }
         _ => (0, data),
     };
 
     if !data.is_empty() {
-        dbg!(data);
         return Err("Extra bytes at end of float".into());
     }
 
