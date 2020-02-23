@@ -1,6 +1,7 @@
 stages:
   - build
   - test
+  - deploy
 
 build:
   stage: build
@@ -18,3 +19,14 @@ test:
     - cargo test --verbose
   dependencies:
     - build
+    
+docs:
+  stage: deploy
+  image: rust:latest
+  script:
+    - cargo doc
+  dependencies:
+    - build
+  artifacts:
+    paths:
+      - target/doc/
