@@ -1,8 +1,13 @@
 [package]
 name = "hexponent"
 version = "0.1.0"
-authors = ["pythondude325 <me@gisch.dev>"]
+authors = ["Graham Scheaffer <me@gisch.dev>"]
 edition = "2018"
+description = "Hexadecimal float parsing"
+repository = "https://gitlab.com/pythondude325/hexponent"
+documentation = "https://docs.rs/hexponent"
+categories = ["parser-implementations"]
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
