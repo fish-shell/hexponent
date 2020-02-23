@@ -29,6 +29,19 @@ fn test_float(s: &str, result: f32) {
     assert_eq_float!(float_result, result);
 }
 
+// TODO: Once I switch to typed errors, convert this to a macro that accepts
+// a pattern to make sure it returns the correct error.
+fn test_parse_error(s: &str) {
+    assert!(parse_float(s.as_ref()).is_err());
+}
+
+// // There are no conversion errors yet.
+// fn test_conversion_error(s: &str) {
+//     let float_repr = parse_float(s.as_ref()).unwrap();
+//     let float_result: Result<f32, _> = float_repr.try_into();
+//     assert!(float_result.is_err());
+// }
+
 #[test]
 fn test_zero() {
     test_float("0x0", 0.0);
@@ -100,4 +113,21 @@ fn rcc_tests() {
     test_float("0x.ep-0", 0.875);
     test_float("0xe.p-4", 0.875);
     test_float("0xep-4", 0.875);
+}
+
+#[test]
+fn test_incomplete() {
+    test_parse_error("");
+    test_parse_error("-");
+    test_parse_error("+");
+    test_parse_error("-3.2");
+    test_parse_error("0x");
+    test_parse_error("-0x");
+    test_parse_error("+0x");
+    test_parse_error("0x.");
+    test_parse_error("0xp");
+    test_parse_error("0x.p1");
+    test_parse_error("0x1p");
+    test_parse_error("0x1p+");
+    test_parse_error("0x1p-");
 }
