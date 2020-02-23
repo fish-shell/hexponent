@@ -1,0 +1,20 @@
+stages:
+  - build
+  - test
+
+build:
+  stage: build
+  image: rust:latest
+  script:
+    - cargo build
+  artifacts:
+    paths:
+      - target/
+
+test:
+  stage: test
+  image: rust:latest
+  script:
+    - cargo test --verbose
+  dependencies:
+    - build
