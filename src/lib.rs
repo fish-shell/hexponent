@@ -5,7 +5,7 @@
 //!
 //! This crate is used for parsing hexadecimal floating-point literals.
 
-use std::convert;
+use std::convert::TryInto;
 use std::error::Error;
 
 fn hex_digit_to_int(digit: u8) -> Option<u8> {
@@ -42,106 +42,86 @@ pub struct Float {
     exponent: i32,
 }
 
-impl Into<f32> for Float {
-    fn into(self) -> f32 {
-        // This code should work for arbitrary values of the following
-        // constants, but a more efficient method is available for single- and
-        // double-precision. (doing the mantissa all at once)
+impl TryInto<f32> for Float {
+    type Error = Box<dyn Error>;
 
-        // Number of bits available to store the exponent
+    fn try_into(self) -> Result<f32, Box<dyn Error>> {
+        // This code should work for arbitrary values of the following
+        // constants
         const EXPONENT_BITS: u32 = 8;
-        const EXPONENT_BIAS: u32 = 127;
-        // Number of bits available to store the mantissa
         const MANTISSA_BITS: u32 = 23;
+
+        // The spec always gives an exponent bias that follows this formula.
+        const EXPONENT_BIAS: u32 = (1 << (EXPONENT_BITS - 1)) - 1;
 
         // 4 bits for each digit of the ipart
         let mut exponent_offset: i32 = (self.ipart.len() as i32) * 4;
 
+        // All the digits together, it doesn't matter where the (hexa)decimal
+        // point was because it was accounted for in the exponent_offset.
         let mut digits = self.ipart;
-        // Reserve enough space for the fpart and padding zero
-        digits.reserve(self.fpart.len() + 1);
         digits.extend_from_slice(&self.fpart);
-        digits.push(b'0'); // Get rid of this hack
 
-        // These parts are the digits all strung together and put into parts of
-        // two digits. It doesn't matter where the (hexa)decimal point was
-        // because it was accouned for in the exponent_offset.
-        let mut parts = digits.chunks(8 / 4).map(|hex_digits| {
-            u8::from_str_radix(std::str::from_utf8(hex_digits).unwrap(), 16).unwrap()
-        });
-
-        let mut mantissa_result = 0u32;
-        // This variable is used to keep track of how many bits are used in the
-        // mantissa. It is used to shift each part by the right amount so it can
-        // be put into the mantissa_result correctly.
-        let mut mantissa_bits_left: i32 = MANTISSA_BITS as i32;
-
-        loop {
-            // TODO: Get rid of this unwrap.
-            let mut part = parts.next().unwrap();
-
-            // Take off all leading zero digits.
-            if part == 0 {
-                exponent_offset -= 8;
-            } else {
-                // For the first non-zero digit, take of all leading zero bits,
-                // and the first one. The first one is implied as part of the
-                // IEEE754 Standard.
-                let leading_zeros = part.leading_zeros();
-                exponent_offset -= (leading_zeros + 1) as i32;
-                part <<= leading_zeros + 1;
-                mantissa_result |= (part as u32) << (mantissa_bits_left - 8);
-                mantissa_bits_left -= 7 - leading_zeros as i32;
-                break;
-            }
+        // If there were all
+        if digits.is_empty() {
+            return Ok(0.0);
         }
 
-        for part in parts {
-            // If there are no mantissa bits left, drop excess precision.
-            if mantissa_bits_left <= 0 {
+        // This code is a work of art.
+        let mut mantissa_result: u32 = 0;
+        for (index, digit) in digits.iter().enumerate() {
+            if index as u32 * 4 > MANTISSA_BITS {
+                // TODO: Warn for excessive precision.
                 break;
             }
-
-            if mantissa_bits_left >= 8 {
-                // The part needs to be shifted left to be in the correct
-                // position.
-                mantissa_result |= (part as u32) << (mantissa_bits_left - 8);
-            } else {
-                // The byte needs to be shifted right to be in the correct
-                // position. This also shifts out the last parts of the byte
-                // that does not fit.
-                mantissa_result |= (part as u32) >> (8 - mantissa_bits_left);
-            }
-            mantissa_bits_left -= 8;
+            let mut digit_value = hex_digit_to_int(*digit).unwrap() as u32;
+            digit_value <<= 32 - (index + 1) * 4;
+            mantissa_result |= digit_value;
         }
+        let leading_zeros = mantissa_result.leading_zeros();
+        exponent_offset -= leading_zeros as i32 + 1;
+        mantissa_result <<= leading_zeros + 1;
+        mantissa_result >>= 32 - MANTISSA_BITS;
 
         // Multiply self.exponent by four because it is the base-16 exponent.
         // It needs to be in base-2. 16^x = 2^4x
         let final_exponent = exponent_offset + 4 * self.exponent;
+
+        // Check for underflows
+        if final_exponent < std::f32::MIN_EXP - 1 {
+            // TODO: Add a warning for underflow.
+            // TODO: Implement subnormal numbers.
+            return Ok(if self.is_positive { 0.0 } else { -0.0 });
+        }
+
+        // Check for overflows
+        if final_exponent > std::f32::MAX_EXP {
+            // TODO: Add a warning for overflow.
+            return Ok(if self.is_positive {
+                std::f32::INFINITY
+            } else {
+                std::f32::NEG_INFINITY
+            });
+        }
 
         let exponent_result: u32 =
             ((final_exponent + EXPONENT_BIAS as i32) as u32) << MANTISSA_BITS;
 
         let sign_result: u32 = (!self.is_positive as u32) << (MANTISSA_BITS + EXPONENT_BITS);
 
-        f32::from_bits(sign_result | exponent_result | mantissa_result)
+        Ok(f32::from_bits(
+            sign_result | exponent_result | mantissa_result,
+        ))
+
+        // // This might be a bit faster.
+        // let mut final_result = !self.is_positive as u32;
+        // final_result <<= EXPONENT_BITS;
+        // final_result |= (final_exponent + EXPONENT_BIAS as i32) as u32;
+        // final_result <<= MANTISSA_BITS;
+        // final_result |= mantissa_result;
+        // f32::from_bits(final_result)
     }
 }
-
-impl convert::TryFrom<&[u8]> for Float {
-    type Error = Box<dyn Error>;
-
-    fn try_from(data: &[u8]) -> Result<Float, Box<dyn Error>> {
-        parse_float(data)
-    }
-}
-
-// // This should be trivial
-// impl Into<f64> for Float {
-//     impl into(self) -> f64 {
-
-//     }
-// }
 
 fn consume_sign(data: &[u8]) -> (bool, &[u8]) {
     match data.get(0) {
@@ -154,10 +134,7 @@ fn consume_sign(data: &[u8]) -> (bool, &[u8]) {
 fn consume_hex_digits(data: &[u8]) -> (&[u8], &[u8]) {
     let i = data
         .iter()
-        .position(|b| match b {
-            b'0'..=b'9' | b'a'..=b'f' | b'A'..=b'F' => false,
-            _ => true,
-        })
+        .position(|&b| hex_digit_to_int(b).is_none())
         .unwrap_or_else(|| data.len());
 
     data.split_at(i)
@@ -186,15 +163,15 @@ pub fn parse_float(data: &[u8]) -> Result<Float, Box<dyn Error>> {
     }
 
     // Trim leading zeros.
-    let ipart: &[u8] = if let Some(first_nonzero_digit) = ipart.iter().position(|&d| d == b'0') {
-        &ipart[first_nonzero_digit..]
+    let ipart: &[u8] = if let Some(first_digit) = ipart.iter().position(|&d| d != b'0') {
+        &ipart[first_digit..]
     } else {
         &[]
     };
 
     // Trim trailing zeros
-    let fpart: &[u8] = if let Some(last_nonzero_digit) = fpart.iter().rposition(|&d| d == b'0') {
-        &fpart[..last_nonzero_digit]
+    let fpart: &[u8] = if let Some(last_digit) = fpart.iter().rposition(|&d| d != b'0') {
+        &fpart[..=last_digit]
     } else {
         &[]
     };
@@ -226,6 +203,7 @@ pub fn parse_float(data: &[u8]) -> Result<Float, Box<dyn Error>> {
     };
 
     if !data.is_empty() {
+        dbg!(data);
         return Err("Extra bytes at end of float".into());
     }
 
@@ -241,22 +219,96 @@ pub fn parse_float(data: &[u8]) -> Result<Float, Box<dyn Error>> {
 mod tests {
     use super::*;
 
-    #[allow(clippy::float_cmp)]
+    // This macros serves two functions:
+    // 1. It avoids the float_cmp clippy lint
+    // 2. It is able to tell the difference between floats that are equal, but
+    // are not the same. (ex: zero and negative zero)
+    macro_rules! assert_eq_float {
+        ($left: expr, $right: expr) => {
+            let left_val: f32 = $left;
+            let right_val: f32 = $right;
+            if left_val.to_bits() != right_val.to_bits() {
+                panic!(
+                    r#"float assertion failed: `(left == right)`
+left: `{:?}` (`{:08x}`)
+right: `{:?}` (`{:08x}`)"#,
+                    left_val,
+                    left_val.to_bits(),
+                    right_val,
+                    right_val.to_bits()
+                );
+            }
+        };
+    }
+
     fn test_float(s: &str, result: f32) {
         let float_repr = parse_float(s.as_ref()).unwrap();
-        let float_result: f32 = float_repr.into();
-        assert_eq!(float_result, result);
+        let float_result: f32 = float_repr.try_into().unwrap();
+        assert_eq_float!(float_result, result);
     }
 
     #[test]
-    fn math_tests() {
-        test_float("0x0.8", 0.5);
-        test_float("0x0.4", 0.25);
+    fn test_zero() {
+        test_float("0x0", 0.0);
+        test_float("0x0.", 0.0);
+        test_float("0x.0", 0.0);
+        test_float("0x0.0", 0.0);
+        test_float("0x0000.0000", 0.0);
+    }
 
-        // test_float("0x0.01", 0.003_906_25);
-        // test_float("0x0.1", 0.0625);
-        // test_float("0x1", 1.0);
-        // test_float("0x10", 16.0);
-        // test_float("0x100", 266.0);
+    #[test]
+    fn test_integers() {
+        test_float("0x11", 17.0);
+        test_float("0x21", 33.0);
+        test_float("0x22", 34.0);
+
+        test_float("0xDEAD", 57005.0);
+        test_float("0xBEEF", 48879.0);
+    }
+
+    #[test]
+    fn test_fractions() {
+        test_float("0x0.2", 0.125);
+        test_float("0x0.4", 0.25);
+        test_float("0x0.8", 0.5);
+        test_float("0x0.c", 0.75);
+        test_float("0x0.e", 0.875);
+    }
+
+    #[test]
+    fn test_exponents() {
+        test_float("0x0.01", 0.003_906_25);
+        test_float("0x0.1", 0.0625);
+        test_float("0x1", 1.0);
+        test_float("0x10", 16.0);
+        test_float("0x100", 256.0);
+
+        test_float("0x1p-2", 0.003_906_25);
+        test_float("0x1p-1", 0.0625);
+        test_float("0x1p0", 1.0);
+        test_float("0x1p1", 16.0);
+        test_float("0x1p2", 256.0);
+
+        test_float("0x0.01p2", 1.0);
+        test_float("0x0.1p1", 1.0);
+        test_float("0x1p0", 1.0);
+        test_float("0x10p-1", 1.0);
+        test_float("0x100p-2", 1.0);
+    }
+
+    #[test]
+    fn test_overflow_underflow() {
+        test_float("0x1p1000", std::f32::INFINITY);
+        test_float("-0x1p1000", std::f32::NEG_INFINITY);
+
+        // These two are technically wrong, but are correct enough. They should
+        // acually return subnormal numbers, but i have not implemented that
+        // yet.
+        test_float("0x1p-26", 0.0);
+        test_float("-0x1p-26", -0.0);
+
+        // These acually should underflow to zero.
+        test_float("0x1p-1000", 0.0);
+        test_float("-0x1p-1000", -0.0);
     }
 }
