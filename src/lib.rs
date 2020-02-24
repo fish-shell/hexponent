@@ -16,7 +16,7 @@
 //! 
 //! ## Features
 //! - No dependencies
-//! - Faster non-UTF-8 parser
+//! - Faster, non-UTF-8 parser
 //! - Precision warnings
 //! 
 //! ## Differences from the specification
