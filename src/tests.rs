@@ -1,4 +1,4 @@
-use crate::{parse_float, ParseError};
+use crate::{Float, ParseError};
 
 // This macros serves two functions:
 // 1. It avoids the float_cmp clippy lint
@@ -23,23 +23,14 @@ right: `{:?}` (`{:08x}`)"#,
 }
 
 fn test_float(s: &str, result: f32) {
-    let float_repr = parse_float(s.as_ref()).unwrap();
+    let float_repr = s.parse::<Float>().unwrap();
     let float_result: f32 = float_repr.into();
     assert_eq_float!(float_result, result);
 }
 
-// TODO: Once I switch to typed errors, convert this to a macro that accepts
-// a pattern to make sure it returns the correct error.
 fn test_parse_error(s: &str, error: ParseError) {
-    assert_eq!(parse_float(s.as_ref()).unwrap_err(), error);
+    assert_eq!(s.parse::<Float>().unwrap_err(), error);
 }
-
-// // There are no conversion errors yet.
-// fn test_conversion_error(s: &str) {
-//     let float_repr = parse_float(s.as_ref()).unwrap();
-//     let float_result: Result<f32, _> = float_repr.try_into();
-//     assert!(float_result.is_err());
-// }
 
 #[test]
 fn test_zero() {
