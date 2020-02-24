@@ -1,6 +1,9 @@
 # Hexponent
 A library to parse hexadecimal floating point numbers.
 
+## Documentation
+Documentation can be found on at https://docs.rs/hexponent/
+
 ## Todo
 - Switch to `thiserror` for errors
 - Implement warnings
