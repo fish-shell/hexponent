@@ -34,9 +34,9 @@ pub enum ConversionResult<T> {
     /// The conversion was precise and the result represents the original exactly.
     Precise(T),
 
-    // I should be able to calculate how imprecise the conversion is too, which
-    // might be useful. This might allow some subnormal numbers to be returned
-    // as precise results.
+    // TODO: I should be able to calculate how imprecise the conversion is too,
+    // which might be useful. This also might allow some subnormal numbers to be
+    // returned as precise results.
     /// The conversion was imprecise and the result is as close to the original
     /// as possible.
     Imprecise(T),
