@@ -5,8 +5,7 @@ A library to parse hexadecimal floating point numbers.
 Documentation can be found on at https://docs.rs/hexponent/
 
 ## Todo
-- Switch to `thiserror` for errors
-- Implement warnings
+- Add warning for excessive precision
 - Implement subnormal numbers
 
 ## License
