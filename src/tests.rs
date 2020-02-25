@@ -103,6 +103,9 @@ fn rcc_tests() {
     test_float("0x.ep-0", 0.875);
     test_float("0xe.p-4", 0.875);
     test_float("0xep-4", 0.875);
+
+    // Hexf crashes on this one.
+    "0x.000000000000000000102".parse::<FloatLiteral>().unwrap();
 }
 
 #[test]
@@ -123,4 +126,10 @@ fn test_incomplete() {
     test_parse_error("0x1p10000000000", ParseError::ExponentOverflow);
     test_parse_error("0x1p-10000000000", ParseError::ExponentOverflow);
     test_parse_error("0xbaddata", ParseError::ExtraData);
+}
+
+#[test]
+fn test_fuzzer_finds() {
+    // Found by Byter on 2020-02-24
+    "0X.0000002".parse::<FloatLiteral>().unwrap();
 }

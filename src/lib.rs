@@ -98,8 +98,8 @@ impl From<std::num::ParseIntError> for ParseError {
 #[derive(Debug, Clone)]
 pub struct FloatLiteral {
     is_positive: bool,
-    ipart: Vec<u8>,
-    fpart: Vec<u8>,
+    digits: Vec<u8>,
+    decimal_offset: i32,
     exponent: i32,
 }
 
@@ -115,22 +115,17 @@ impl FloatLiteral {
         // The spec always gives an exponent bias that follows this formula.
         const EXPONENT_BIAS: u32 = (1 << (EXPONENT_BITS - 1)) - 1;
 
-        // 4 bits for each digit of the ipart
-        let mut exponent_offset: i32 = (self.ipart.len() as i32) * 4;
-
-        // All the digits together, it doesn't matter where the (hexa)decimal
-        // point was because it was accounted for in the exponent_offset.
-        let mut digits = self.ipart;
-        digits.extend_from_slice(&self.fpart);
+        // 4 bits for each hexadecimal offset
+        let mut exponent_offset: i32 = self.decimal_offset * 4;
 
         // If there were all
-        if digits.is_empty() {
+        if self.digits.is_empty() {
             return ConversionResult::Precise(0.0);
         }
 
         // This code is a work of art.
         let mut mantissa_result: u32 = 0;
-        for (index, digit) in digits.iter().enumerate() {
+        for (index, digit) in self.digits.iter().enumerate() {
             if index as u32 * 4 > MANTISSA_BITS {
                 // TODO: Warn for excessive precision.
                 // This should should technically return an Imprecise, but not
@@ -215,20 +210,6 @@ impl FloatLiteral {
             return Err(ParseError::MissingDigits);
         }
 
-        // Trim leading zeros.
-        let ipart: &[u8] = if let Some(first_digit) = ipart.iter().position(|&d| d != b'0') {
-            &ipart[first_digit..]
-        } else {
-            &[]
-        };
-
-        // Trim trailing zeros
-        let fpart: &[u8] = if let Some(last_digit) = fpart.iter().rposition(|&d| d != b'0') {
-            &fpart[..=last_digit]
-        } else {
-            &[]
-        };
-
         let (exponent, data) = match data.get(0) {
             Some(b'P') | Some(b'p') => {
                 let data = &data[1..];
@@ -268,12 +249,22 @@ impl FloatLiteral {
             return Err(ParseError::ExtraData);
         }
 
-        Ok(FloatLiteral {
-            is_positive,
-            ipart: ipart.to_vec(),
-            fpart: fpart.to_vec(),
-            exponent,
-        })
+        let mut raw_digits = ipart.to_vec();
+        raw_digits.extend_from_slice(fpart);
+
+        let first_digit = raw_digits.iter().position(|&d| d != b'0');
+
+        let (digits, decimal_offset) = if let Some(first_digit) = first_digit {
+            // Unwrap is safe because there is at least one digit.
+            let last_digit = raw_digits.iter().rposition(|&d| d != b'0').unwrap();
+            let decimal_offset = (ipart.len() as i32) - (first_digit as i32);
+
+            (raw_digits[first_digit..=last_digit].to_vec(), decimal_offset)
+        } else {
+            (Vec::new(), 0)
+        };
+
+        Ok(FloatLiteral { is_positive, digits, decimal_offset, exponent })
     }
 }
 
