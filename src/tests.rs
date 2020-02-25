@@ -1,4 +1,4 @@
-use crate::{Float, ParseError};
+use crate::{FloatLiteral, ParseError};
 
 // This macros serves two functions:
 // 1. It avoids the float_cmp clippy lint
@@ -23,13 +23,13 @@ right: `{:?}` (`{:08x}`)"#,
 }
 
 fn test_float(s: &str, result: f32) {
-    let float_repr = s.parse::<Float>().unwrap();
+    let float_repr = s.parse::<FloatLiteral>().unwrap();
     let float_result: f32 = float_repr.into();
     assert_eq_float!(float_result, result);
 }
 
 fn test_parse_error(s: &str, error: ParseError) {
-    assert_eq!(s.parse::<Float>().unwrap_err(), error);
+    assert_eq!(s.parse::<FloatLiteral>().unwrap_err(), error);
 }
 
 #[test]

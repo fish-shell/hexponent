@@ -6,19 +6,19 @@
 //!
 //! Hexponent is a hexadecimal literal parser for Rust based on the C11
 //! specification section [6.4.4.2](http://port70.net/~nsz/c/c11/n1570.html#6.4.4.2).
-//! 
+//!
 //! ```rust
-//! use hexponent::Float;
-//! let float_repr: Float = "0x3.4".parse().unwrap();
+//! use hexponent::FloatLiteral;
+//! let float_repr: FloatLiteral = "0x3.4".parse().unwrap();
 //! let value = float_repr.into_f32().unwrap();
 //! assert_eq!(value, 3.25);
 //! ```
-//! 
+//!
 //! ## Features
 //! - No dependencies
 //! - Faster, non-UTF-8 parser
 //! - Precision warnings
-//! 
+//!
 //! ## Differences from the specification
 //! There are two places where hexponent differs from the C11 specificaiton.
 //! - An exponent is not required. (`0x1.2` is allowed)
@@ -96,14 +96,14 @@ impl From<std::num::ParseIntError> for ParseError {
 /// This struct is a representation of the text, that can be used to convert to
 /// both single- and double-precision floats.
 #[derive(Debug, Clone)]
-pub struct Float {
+pub struct FloatLiteral {
     is_positive: bool,
     ipart: Vec<u8>,
     fpart: Vec<u8>,
     exponent: i32,
 }
 
-impl Float {
+impl FloatLiteral {
     /// Convert the `self` to an `f32` and return the precision of the
     /// conversion.
     pub fn into_f32(self) -> ConversionResult<f32> {
@@ -189,7 +189,7 @@ impl Float {
     ///
     /// This is based on hexadecimal floating constants in the C11 specification,
     /// section [6.4.4.2](http://port70.net/~nsz/c/c11/n1570.html#6.4.4.2).
-    pub fn from_bytes(data: &[u8]) -> Result<Float, ParseError> {
+    pub fn from_bytes(data: &[u8]) -> Result<FloatLiteral, ParseError> {
         let (is_positive, data) = match data.get(0) {
             Some(b'+') => (true, &data[1..]),
             Some(b'-') => (false, &data[1..]),
@@ -268,7 +268,7 @@ impl Float {
             return Err(ParseError::ExtraData);
         }
 
-        Ok(Float {
+        Ok(FloatLiteral {
             is_positive,
             ipart: ipart.to_vec(),
             fpart: fpart.to_vec(),
@@ -277,14 +277,14 @@ impl Float {
     }
 }
 
-impl std::str::FromStr for Float {
+impl std::str::FromStr for FloatLiteral {
     type Err = ParseError;
-    fn from_str(s: &str) -> Result<Float, ParseError> {
-        Float::from_bytes(s.as_bytes())
+    fn from_str(s: &str) -> Result<FloatLiteral, ParseError> {
+        FloatLiteral::from_bytes(s.as_bytes())
     }
 }
 
-impl Into<f32> for Float {
+impl Into<f32> for FloatLiteral {
     fn into(self) -> f32 {
         self.into_f32().unwrap()
     }
