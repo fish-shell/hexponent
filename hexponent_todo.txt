@@ -1,0 +1,40 @@
+- Rename `Float` to `HexFloatLiteral`
+- FPFormat trait and `HexFloatLiteral::convert`
+  -> trait FPFormat: ops::Neg<Output=Self> + Sized {
+         type Int;
+         const EXPONENT_BITS: u32;
+         const SIGNIFICAND_BITS: u32;
+	 // const EXPONENT_BIAS: i32 = (1 << (Self::EXPONENT_BITS - 1)) - 1;
+         const INFINITY: Self;
+         const ZERO: Self;
+         fn from_bits(bits: Self::Int) -> Self;
+     }
+  -> HexFloatLiteral::convert<F: FPFormat>(self) -> ConversionResult<F>
+  -> impl<F: FPFormat> From<HexFloatLiteral> for F
+- Mantissa to significand
+- CI rustc 1.37.0 compat testing.
+- Add test for "0x.000000000000000000000102"
+- Single digit vector with decimal offset (with better zero controls)
+  -> struct FloatLiteral {
+         positive: bool,
+         digits: Vec<u8>,
+         exponent_offset: usize,
+         exponent: i32,
+     }
+- Add benchmarking with Criterion.rs
+
+- Possible more trait implementations
+  -> impl From<&[u8]> for HexFloatLiteral
+  -> impl From<&str> for HexFloatLiteral
+  -> impl<F: FPFormat> From<F> for HexFloatLiteral // Used for hex-float serialization
+
+
+- Testing with libc sscanf/sprintf
+  -> Generate float, convert to hex-literal with sprintf, then go back with Hexponent and scan, compare results.
+- Implement serialization (simple, suboptimal serialization)
+  -> impl<F: FPFormat> fmt::LowerHex for F
+  -> impl<F: FPFormat> fmt::UpperHex for F
+- ConversionResult measure imprecision
+  -> Imprecise result can give number of digits not used. (Or another measure)
+- Implement subnormal numbers
+  -> Reorganize convert function to do significand last.
