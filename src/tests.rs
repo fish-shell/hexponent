@@ -138,7 +138,7 @@ fn test_fuzzer_finds() {
 fn test_zero_trimming() {
     test_float("0x0.0000000001p+40", 1.0);
     test_float("0x10000000000p-40", 1.0);
-    
+
     // Right now these can only be tested to not crash because my rounding is
     // incorrect.
     "0x10000000000".parse::<FloatLiteral>().unwrap();

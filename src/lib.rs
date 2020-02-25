@@ -259,12 +259,20 @@ impl FloatLiteral {
             let last_digit = raw_digits.iter().rposition(|&d| d != b'0').unwrap();
             let decimal_offset = (ipart.len() as i32) - (first_digit as i32);
 
-            (raw_digits[first_digit..=last_digit].to_vec(), decimal_offset)
+            (
+                raw_digits[first_digit..=last_digit].to_vec(),
+                decimal_offset,
+            )
         } else {
             (Vec::new(), 0)
         };
 
-        Ok(FloatLiteral { is_positive, digits, decimal_offset, exponent })
+        Ok(FloatLiteral {
+            is_positive,
+            digits,
+            decimal_offset,
+            exponent,
+        })
     }
 }
 
