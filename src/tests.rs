@@ -1,3 +1,4 @@
+use std::ffi;
 use crate::{FloatLiteral, ParseError};
 
 // This macros serves two functions:
@@ -26,6 +27,9 @@ fn test_float(s: &str, result: f32) {
     let float_repr = s.parse::<FloatLiteral>().unwrap();
     let float_result: f32 = float_repr.into();
     assert_eq_float!(float_result, result);
+
+    let libc_result = string_to_f32(s.as_ref()).unwrap();
+    assert_eq_float!(float_result, libc_result);
 }
 
 fn test_parse_error(s: &str, error: ParseError) {
@@ -85,16 +89,16 @@ fn test_exponents() {
 fn test_overflow_underflow() {
     test_float("0x1p1000", std::f32::INFINITY);
     test_float("-0x1p1000", std::f32::NEG_INFINITY);
-
-    // These two are technically wrong, but are correct enough. They should
-    // acually return subnormal numbers, but i have not implemented that
-    // yet.
-    test_float("0x1p-128", 0.0);
-    test_float("-0x1p-128", -0.0);
-
-    // These acually should underflow to zero.
     test_float("0x1p-1000", 0.0);
     test_float("-0x1p-1000", -0.0);
+}
+
+#[test]
+#[ignore]
+fn test_subnormal(){
+    // I haven't implemented subnormal numbers yet.
+    test_float("0x1p-128", 0.0);
+    test_float("-0x1p-128", -0.0);
 }
 
 #[test]
@@ -143,4 +147,36 @@ fn test_zero_trimming() {
     // incorrect.
     "0x10000000000".parse::<FloatLiteral>().unwrap();
     "0x.0000000001".parse::<FloatLiteral>().unwrap();
+}
+
+// I had both of these functions checked over by jynelson
+
+#[allow(unsafe_code)]
+fn f32_to_string(f: f32) -> Result<Vec<u8>, ()> {
+    let mut dest = [0u8; 32];
+    let format = ffi::CString::new("%a").unwrap();
+    let number = f as libc::c_double;
+    let check = unsafe {
+        libc::snprintf(dest.as_mut_ptr() as *mut i8, 32, format.as_ptr(), number)
+    };
+    if check >= 0 && check < 32 {
+        Ok(dest[..check as usize].to_vec())
+    } else {
+        Err(())
+    }
+}
+
+#[allow(unsafe_code)]
+fn string_to_f32(string: &[u8]) -> Result<f32, ()> {
+    let source = ffi::CString::new(string).unwrap();
+    let format = ffi::CString::new("%a").unwrap();
+    let mut dest: f32 = 0.0;
+    let check = unsafe {
+        libc::sscanf(source.as_ptr(), format.as_ptr(), &mut dest as *mut _)
+    };
+    if check == 1 {
+        Ok(dest)
+    } else {
+        Err(())
+    }
 }
