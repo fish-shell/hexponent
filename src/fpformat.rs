@@ -6,8 +6,6 @@ macro_rules! impl_fpformat {
     ($fp_type:ty, $bits_type:ty, $exponent_bits: literal, $mantissa_bits: literal, $from_bits: expr, $infinity: expr, $max_exp: expr, $min_exp: expr) => {
         impl FPFormat for $fp_type {
             fn from_literal(literal: FloatLiteral) -> ConversionResult<$fp_type> {
-                // This code should work for arbitrary values of the following
-                // constants
                 const EXPONENT_BITS: u32 = $exponent_bits;
                 const MANTISSA_BITS: u32 = $mantissa_bits;
 

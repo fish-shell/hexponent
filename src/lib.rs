@@ -32,6 +32,7 @@ use parse_utils::*;
 mod fpformat;
 pub use fpformat::FPFormat;
 
+#[derive(Debug)]
 /// Indicates the preicsision of a conversion
 pub enum ConversionResult<T> {
     /// The conversion was precise and the result represents the original exactly.
@@ -107,13 +108,13 @@ pub struct FloatLiteral {
 }
 
 impl FloatLiteral {
-    /// Convert the `self` to an `f32` and return the precision of the
+    /// Convert the `self` to an `f32` or `f64` and return the precision of the
     /// conversion.
     pub fn convert<F: FPFormat>(self) -> ConversionResult<F> {
         F::from_literal(self)
     }
 
-    /// Parse a slice of bytes into a `Float`.
+    /// Parse a slice of bytes into a `FloatLiteral`.
     ///
     /// This is based on hexadecimal floating constants in the C11 specification,
     /// section [6.4.4.2](http://port70.net/~nsz/c/c11/n1570.html#6.4.4.2).
