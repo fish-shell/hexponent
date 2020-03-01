@@ -43,10 +43,10 @@ honggfuzz:
   image: rust:latest
   variables:
     HFUZZ_RUN_ARGS: "\
-    --verbose\
-    --run_time 1800\
-    --exit_upon_crash\
-    --tmout_sigvtalrm\
+    --verbose \
+    --run_time=1800 \
+    --exit_upon_crash \
+    --tmout_sigvtalrm \
     --max_file_size=32"
   script:
     - apt update
