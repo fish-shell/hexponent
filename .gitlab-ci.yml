@@ -50,6 +50,8 @@ honggfuzz:
     --tmout_sigvtalrm\
     --max_file_size=32"
   script:
+    - apt update
+    - apt install build-essential binutils-dev libunwind-dev libblocksruntime-dev
     - cargo install honggfuzz --version="0.5.45"
     - cd fuzz
     - cargo hfuzz run fuzz
