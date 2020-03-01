@@ -10,7 +10,7 @@
 //! ```rust
 //! use hexponent::FloatLiteral;
 //! let float_repr: FloatLiteral = "0x3.4".parse().unwrap();
-//! let value = float_repr.into_f32().unwrap();
+//! let value = float_repr.convert::<f32>().inner();
 //! assert_eq!(value, 3.25);
 //! ```
 //!
@@ -29,6 +29,9 @@ use std::fmt;
 mod parse_utils;
 use parse_utils::*;
 
+mod fpformat;
+pub use fpformat::FPFormat;
+
 /// Indicates the preicsision of a conversion
 pub enum ConversionResult<T> {
     /// The conversion was precise and the result represents the original exactly.
@@ -44,7 +47,7 @@ pub enum ConversionResult<T> {
 
 impl<T> ConversionResult<T> {
     /// Convert the result to it's contained type.
-    pub fn unwrap(self) -> T {
+    pub fn inner(self) -> T {
         match self {
             ConversionResult::Precise(f) => f,
             ConversionResult::Imprecise(f) => f,
@@ -106,78 +109,8 @@ pub struct FloatLiteral {
 impl FloatLiteral {
     /// Convert the `self` to an `f32` and return the precision of the
     /// conversion.
-    pub fn into_f32(self) -> ConversionResult<f32> {
-        // This code should work for arbitrary values of the following
-        // constants
-        const EXPONENT_BITS: u32 = 8;
-        const MANTISSA_BITS: u32 = 23;
-
-        // The spec always gives an exponent bias that follows this formula.
-        const EXPONENT_BIAS: u32 = (1 << (EXPONENT_BITS - 1)) - 1;
-
-        // 4 bits for each hexadecimal offset
-        let mut exponent_offset: i32 = self.decimal_offset * 4;
-
-        // If there were all
-        if self.digits.is_empty() {
-            return ConversionResult::Precise(0.0);
-        }
-
-        // This code is a work of art.
-        let mut mantissa_result: u32 = 0;
-        for (index, digit) in self.digits.iter().enumerate() {
-            if index as u32 * 4 > MANTISSA_BITS {
-                // TODO: Warn for excessive precision.
-                // This should should technically return an Imprecise, but not
-                // yet.
-                break;
-            }
-            let mut digit_value = hex_digit_to_int(*digit).unwrap() as u32;
-            digit_value <<= 32 - (index + 1) * 4;
-            mantissa_result |= digit_value;
-        }
-        let leading_zeros = mantissa_result.leading_zeros();
-        exponent_offset -= leading_zeros as i32 + 1;
-        mantissa_result <<= leading_zeros + 1;
-        mantissa_result >>= 32 - MANTISSA_BITS;
-
-        let final_exponent = exponent_offset + self.exponent;
-
-        // Check for underflows
-        if final_exponent < std::f32::MIN_EXP - 1 {
-            // TODO: Implement subnormal numbers.
-            if self.is_positive {
-                return ConversionResult::Imprecise(0.0);
-            } else {
-                return ConversionResult::Imprecise(-0.0);
-            };
-        }
-
-        // Check for overflows
-        if final_exponent > std::f32::MAX_EXP {
-            if self.is_positive {
-                return ConversionResult::Imprecise(std::f32::INFINITY);
-            } else {
-                return ConversionResult::Imprecise(std::f32::NEG_INFINITY);
-            };
-        }
-
-        let exponent_result: u32 =
-            ((final_exponent + EXPONENT_BIAS as i32) as u32) << MANTISSA_BITS;
-
-        let sign_result: u32 = (!self.is_positive as u32) << (MANTISSA_BITS + EXPONENT_BITS);
-
-        ConversionResult::Precise(f32::from_bits(
-            sign_result | exponent_result | mantissa_result,
-        ))
-
-        // // This might be a bit faster.
-        // let mut final_result = !self.is_positive as u32;
-        // final_result <<= EXPONENT_BITS;
-        // final_result |= (final_exponent + EXPONENT_BIAS as i32) as u32;
-        // final_result <<= MANTISSA_BITS;
-        // final_result |= mantissa_result;
-        // f32::from_bits(final_result)
+    pub fn convert<F: FPFormat>(self) -> ConversionResult<F> {
+        F::from_literal(self)
     }
 
     /// Parse a slice of bytes into a `Float`.
@@ -280,12 +213,6 @@ impl std::str::FromStr for FloatLiteral {
     type Err = ParseError;
     fn from_str(s: &str) -> Result<FloatLiteral, ParseError> {
         FloatLiteral::from_bytes(s.as_bytes())
-    }
-}
-
-impl Into<f32> for FloatLiteral {
-    fn into(self) -> f32 {
-        self.into_f32().unwrap()
     }
 }
 
