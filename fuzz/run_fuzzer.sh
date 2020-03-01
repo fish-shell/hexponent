@@ -1,5 +1,8 @@
 #!/bin/sh
+cd $(dirname "$0")
+
 HFUZZ_RUN_ARGS="\
+$HFUZZ_RUN_ARGS\
 --threads=4\
 --linux_perf_instr\
 --linux_perf_branch\

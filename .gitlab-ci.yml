@@ -1,6 +1,7 @@
 stages:
   - build
   - test
+  - fuzzing
   - deploy
 
 build:
@@ -36,3 +37,26 @@ docs:
   artifacts:
     paths:
       - target/doc/
+
+honggfuzz:
+  stage: fuzzing
+  when: manual
+  image: rust:latest
+  variables:
+    HFUZZ_RUN_ARGS: "\
+    --verbose\
+    --run_time 1800\
+    --exit_upon_crash\
+    --tmout_sigvtalrm\
+    --max_file_size=32"
+  script:
+    - cargo install honggfuzz --version="0.5.45"
+    - cd fuzz
+    - cargo hfuzz run fuzz
+    - test ! -e hfuzz_workspace/fuzz/*.fuzz
+  dependencies:
+    - build
+  artifacts:
+    when: on_failure
+    paths:
+      - fuzz/hfuzz_workspace
