@@ -47,7 +47,10 @@ honggfuzz:
     --run_time=1800 \
     --exit_upon_crash \
     --tmout_sigvtalrm \
-    --max_file_size=32"
+    --timeout=1 \
+    --max_file_size=32 \
+    --linux_perf_instr \
+    --linux_perf_branch"
   script:
     - apt update
     - apt install -y build-essential binutils-dev libunwind-dev libblocksruntime-dev
