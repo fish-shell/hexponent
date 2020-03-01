@@ -196,20 +196,6 @@ fn test_double_precision() {
 // I had both of these functions checked over by jynelson
 
 #[allow(unsafe_code)]
-fn f32_to_string(f: f32) -> Result<Vec<u8>, ()> {
-    let mut dest = [0u8; 32];
-    let format = ffi::CString::new("%a").unwrap();
-    let number = f as libc::c_double;
-    let check =
-        unsafe { libc::snprintf(dest.as_mut_ptr() as *mut i8, 32, format.as_ptr(), number) };
-    if check >= 0 && check < 32 {
-        Ok(dest[..check as usize].to_vec())
-    } else {
-        Err(())
-    }
-}
-
-#[allow(unsafe_code)]
 fn f64_to_string(f: f64) -> Result<Vec<u8>, ()> {
     let mut dest = [0u8; 32];
     let format = ffi::CString::new("%a").unwrap();
@@ -228,7 +214,7 @@ fn string_to_f32(string: &[u8]) -> Result<f32, ()> {
     let source = ffi::CString::new(string).unwrap();
     let format = ffi::CString::new("%a").unwrap();
     let mut dest: f32 = 0.0;
-    let check = unsafe { libc::sscanf(source.as_ptr(), format.as_ptr(), &mut dest as *mut _) };
+    let check = unsafe { libc::sscanf(source.as_ptr(), format.as_ptr(), &mut dest) };
     if check == 1 {
         Ok(dest)
     } else {
@@ -241,7 +227,7 @@ fn string_to_f64(string: &[u8]) -> Result<f64, ()> {
     let source = ffi::CString::new(string).unwrap();
     let format = ffi::CString::new("%la").unwrap();
     let mut dest: f64 = 0.0;
-    let check = unsafe { libc::sscanf(source.as_ptr(), format.as_ptr(), &mut dest as *mut _) };
+    let check = unsafe { libc::sscanf(source.as_ptr(), format.as_ptr(), &mut dest) };
     if check == 1 {
         Ok(dest)
     } else {
