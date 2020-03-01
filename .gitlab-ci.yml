@@ -1,7 +1,6 @@
 stages:
   - build
   - test
-  - fuzzing
   - deploy
 
 build:
@@ -39,7 +38,7 @@ docs:
       - target/doc/
 
 honggfuzz:
-  stage: fuzzing
+  stage: test
   when: manual
   image: rust:latest
   variables:
