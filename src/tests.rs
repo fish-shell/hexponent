@@ -59,7 +59,7 @@ fn test_double(s: &str, result: f64) {
     assert_eq_double!(double_result, libc_result);
 }
 
-fn test_both(s: &str, float_result: f32){
+fn test_both(s: &str, float_result: f32) {
     let double_result = float_result as f64;
     test_float(s, float_result);
     test_double(s, double_result);

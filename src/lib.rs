@@ -217,5 +217,17 @@ impl std::str::FromStr for FloatLiteral {
     }
 }
 
+impl Into<f32> for FloatLiteral {
+    fn into(self) -> f32 {
+        self.convert().inner()
+    }
+}
+
+impl Into<f64> for FloatLiteral {
+    fn into(self) -> f64 {
+        self.convert().inner()
+    }
+}
+
 #[cfg(test)]
 mod tests;
