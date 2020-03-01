@@ -172,8 +172,7 @@ fn test_fuzzer_finds() {
 
     // Found by Byter on 2020-02-29
     let literal = "0x3p127".parse::<FloatLiteral>().unwrap();
-    println!("{:?}", literal.convert::<f32>());
-
+    assert!(!literal.convert::<f32>().inner().is_nan());
 }
 
 #[test]

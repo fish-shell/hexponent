@@ -53,7 +53,7 @@ macro_rules! impl_fpformat {
                 }
 
                 // Check for overflows
-                if final_exponent > $max_exp {
+                if final_exponent > $max_exp - 1 {
                     if literal.is_positive {
                         return ConversionResult::Imprecise($infinity);
                     } else {
