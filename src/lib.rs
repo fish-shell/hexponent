@@ -99,6 +99,9 @@ impl From<std::num::ParseIntError> for ParseError {
 ///
 /// This struct is a representation of the text, that can be used to convert to
 /// both single- and double-precision floats.
+/// 
+/// `FloatLiteral` is not `Copy`-able because it contains a vector of the
+/// digits from the source data.
 #[derive(Debug, Clone)]
 pub struct FloatLiteral {
     is_positive: bool,
