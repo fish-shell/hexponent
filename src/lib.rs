@@ -16,7 +16,7 @@
 //!
 //! ## Features
 //! - No dependencies
-//! - Faster, non-UTF-8 parser
+//! - Non-UTF-8 parser
 //! - Precision warnings
 //!
 //! ## Differences from the specification
@@ -196,8 +196,12 @@ impl FloatLiteral {
             let last_digit = raw_digits.iter().rposition(|&d| d != b'0').unwrap();
             let decimal_offset = (ipart.len() as i32) - (first_digit as i32);
 
+            // Trim off the leading zeros
+            raw_digits.truncate(last_digit + 1);
+            // Trim off the trailing zeros
+            raw_digits.drain(..first_digit);
             (
-                raw_digits[first_digit..=last_digit].to_vec(),
+                raw_digits,
                 decimal_offset,
             )
         } else {
