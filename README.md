@@ -2,11 +2,10 @@
 A library to parse hexadecimal floating point numbers.
 
 ## Documentation
-Documentation can be found on at https://docs.rs/hexponent/
+Documentation can be found at https://docs.rs/hexponent/
 
 ## Todo
-- Add warning for excessive precision
-- Implement subnormal numbers
+See [issues](https://gitlab.com/pythondude325/hexponent/issues)
 
 ## License
 
