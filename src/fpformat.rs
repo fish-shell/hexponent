@@ -31,7 +31,7 @@ macro_rules! impl_fpformat {
                         // yet.
                         break;
                     }
-                    let mut digit_value = hex_digit_to_int(*digit).unwrap() as $bits_type;
+                    let mut digit_value = *digit as $bits_type;
                     digit_value <<= TOTAL_BITS - (index as u32 + 1) * 4;
                     mantissa_result |= digit_value;
                 }
@@ -72,12 +72,12 @@ macro_rules! impl_fpformat {
                 ))
 
                 // // This might be a bit faster.
-                // let mut final_result = !self.is_positive as u32;
+                // let mut final_result = !literal.is_positive as $bits_type;
                 // final_result <<= EXPONENT_BITS;
-                // final_result |= (final_exponent + EXPONENT_BIAS as i32) as u32;
+                // final_result |= (final_exponent + EXPONENT_BIAS as i32) as $bits_type;
                 // final_result <<= MANTISSA_BITS;
                 // final_result |= mantissa_result;
-                // f32::from_bits(final_result)
+                // ConversionResult::Precise($from_bits(final_result))
             }
         }
     };

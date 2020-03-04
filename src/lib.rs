@@ -99,12 +99,13 @@ impl From<std::num::ParseIntError> for ParseError {
 ///
 /// This struct is a representation of the text, that can be used to convert to
 /// both single- and double-precision floats.
-/// 
+///
 /// `FloatLiteral` is not `Copy`-able because it contains a vector of the
 /// digits from the source data.
 #[derive(Debug, Clone)]
 pub struct FloatLiteral {
     is_positive: bool,
+    // These are the values of the digits, not the digits in ascii form.
     digits: Vec<u8>,
     decimal_offset: i32,
     exponent: i32,
@@ -200,10 +201,13 @@ impl FloatLiteral {
             raw_digits.truncate(last_digit + 1);
             // Trim off the trailing zeros
             raw_digits.drain(..first_digit);
-            (
-                raw_digits,
-                decimal_offset,
-            )
+
+            // Convert all the digits from ascii to their values.
+            for item in raw_digits.iter_mut() {
+                *item = hex_digit_to_int(*item).unwrap();
+            }
+
+            (raw_digits, decimal_offset)
         } else {
             (Vec::new(), 0)
         };
