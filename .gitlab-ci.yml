@@ -52,7 +52,7 @@ honggfuzz:
   script:
     - apt update
     - apt install -y build-essential binutils-dev libunwind-dev libblocksruntime-dev
-    - cargo install honggfuzz --version="0.5.45"
+    - cargo install honggfuzz --version="0.5.47"
     - cd fuzz
     - cargo hfuzz run fuzz
     - test ! -e hfuzz_workspace/fuzz/*.fuzz
