@@ -1,4 +1,3 @@
-use super::parse_utils::hex_digit_to_int;
 use crate::{ConversionResult, FloatLiteral};
 use std::ops;
 
