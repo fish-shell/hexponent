@@ -14,3 +14,8 @@ readme = "README.md"
 
 [dev-dependencies]
 libc = "0.2"
+criterion = "0.3"
+
+[[bench]]
+name = "benchmark"
+harness = false
