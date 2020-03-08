@@ -1,4 +1,4 @@
-use crate::{FloatLiteral, ParseError};
+use crate::{ConversionResult, FloatLiteral, ParseError};
 use std::ffi;
 
 // This macros serves two functions:
@@ -67,6 +67,19 @@ fn test_both(s: &str, float_result: f32) {
 
 fn test_parse_error(s: &str, error: ParseError) {
     assert_eq!(s.parse::<FloatLiteral>().unwrap_err(), error);
+}
+
+fn test_imprecise(s: &str) {
+    let float_literal = s.parse::<FloatLiteral>().unwrap();
+    let conversion_result = float_literal.convert::<f32>();
+    if let ConversionResult::Imprecise(_) = conversion_result {
+        // Pass
+    } else {
+        panic!(
+            "conversion from {:?} to float should have been imprecise (was {:?})",
+            s, conversion_result
+        );
+    }
 }
 
 #[test]
@@ -191,6 +204,13 @@ fn test_double_precision() {
     // test that float rounds and double doesn't
     test_float("0x1000000001", 68_719_480_000.0);
     test_double("0x1000000001", 68_719_476_737.0);
+}
+
+#[test]
+fn test_imprecise_conversions() {
+    test_imprecise("0x1p-10000"); // Underflow
+    test_imprecise("0x123456789abcdef"); // Truncation
+    test_imprecise("0x1p10000"); // Overflow
 }
 
 // I had both of these functions checked over by jynelson

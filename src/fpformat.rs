@@ -22,12 +22,11 @@ macro_rules! impl_fpformat {
                 }
 
                 // This code is a work of art.
+                let mut was_truncated = false;
                 let mut mantissa_result: $bits_type = 0;
                 for (index, digit) in literal.digits.iter().enumerate() {
                     if index as u32 * 4 > MANTISSA_BITS {
-                        // TODO: Warn for excessive precision.
-                        // This should should technically return an Imprecise, but not
-                        // yet.
+                        was_truncated = true;
                         break;
                     }
                     let mut digit_value = *digit as $bits_type;
@@ -66,9 +65,15 @@ macro_rules! impl_fpformat {
                 let sign_result: $bits_type =
                     (!literal.is_positive as $bits_type) << (MANTISSA_BITS + EXPONENT_BITS);
 
-                ConversionResult::Precise($from_bits(
+                let float_value = $from_bits(
                     sign_result | exponent_result | mantissa_result,
-                ))
+                );
+
+                if was_truncated {
+                    ConversionResult::Imprecise(float_value)
+                } else {
+                    ConversionResult::Precise(float_value)
+                }
 
                 // // This might be a bit faster.
                 // let mut final_result = !literal.is_positive as $bits_type;
