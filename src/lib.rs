@@ -24,7 +24,7 @@
 //! - An exponent is not required. (`0x1.2` is allowed)
 //! - `floating-suffix` is *not* parsed. (`0x1p4l` is not allowed)
 
-use std::fmt;
+use std::{fmt, error};
 
 mod parse_utils;
 use parse_utils::*;
@@ -94,6 +94,8 @@ impl From<std::num::ParseIntError> for ParseError {
         ParseError::ExponentOverflow
     }
 }
+
+impl error::Error for ParseError {}
 
 /// Represents a floating point literal
 ///
