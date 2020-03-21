@@ -20,6 +20,12 @@ test:
   dependencies:
     - build
 
+no-std-test:
+  stage: test
+  image: rust:latest
+  script:
+    - cargo test --verbose --no-default-features
+
 backwards-compatibility-test:
   stage: test
   image: rust:1.37.0
