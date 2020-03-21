@@ -19,11 +19,21 @@
 //! - No dependencies
 //! - Non-UTF-8 parser
 //! - Precision warnings
+//! - `no_std` support
 //!
 //! ## Differences from the specification
 //! There are two places where hexponent differs from the C11 specificaiton.
 //! - An exponent is not required. (`0x1.2` is allowed)
 //! - `floating-suffix` is *not* parsed. (`0x1p4l` is not allowed)
+//! 
+//! ## `no_std` support
+//! `no_std` support can be enabled by disabling the default `std` feature for
+//! hexponent in your `Cargo.toml`.
+//! ```toml
+//! hexponent = {version = "0.2", default-features = false}
+//! ```
+//! Disabling the `std` feature can currently only disables the
+//! `std::error::Error` implementation for `ParseError`.
 
 extern crate alloc;
 
@@ -61,6 +71,9 @@ impl<T> ConversionResult<T> {
 }
 
 /// Error type for parsing hexadecimal literals.
+/// 
+/// `ParseError` only implements `std::error::Error` when the `std` feature is
+/// enabled.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ParseError {
     /// No prefix was found. Hexadecimal literals must start with a "0x" or "0X"
@@ -100,6 +113,7 @@ impl From<core::num::ParseIntError> for ParseError {
 }
 
 #[cfg(feature = "std")]
+/// Only available with the `std` feature.
 impl std::error::Error for ParseError {}
 
 /// Represents a floating point literal
