@@ -1,5 +1,5 @@
 use crate::{ConversionResult, FloatLiteral};
-use std::ops;
+use core::ops;
 
 macro_rules! impl_fpformat {
     ($fp_type:ty, $bits_type:ty, $exponent_bits: literal, $mantissa_bits: literal, $from_bits: expr, $infinity: expr, $max_exp: expr, $min_exp: expr) => {
@@ -65,9 +65,7 @@ macro_rules! impl_fpformat {
                 let sign_result: $bits_type =
                     (!literal.is_positive as $bits_type) << (MANTISSA_BITS + EXPONENT_BITS);
 
-                let float_value = $from_bits(
-                    sign_result | exponent_result | mantissa_result,
-                );
+                let float_value = $from_bits(sign_result | exponent_result | mantissa_result);
 
                 if was_truncated {
                     ConversionResult::Imprecise(float_value)
@@ -100,9 +98,9 @@ impl_fpformat!(
     8,
     23,
     f32::from_bits,
-    std::f32::INFINITY,
-    std::f32::MAX_EXP,
-    std::f32::MIN_EXP
+    core::f32::INFINITY,
+    core::f32::MAX_EXP,
+    core::f32::MIN_EXP
 );
 impl_fpformat!(
     f64,
@@ -110,7 +108,7 @@ impl_fpformat!(
     11,
     52,
     f64::from_bits,
-    std::f64::INFINITY,
-    std::f64::MAX_EXP,
-    std::f64::MIN_EXP
+    core::f64::INFINITY,
+    core::f64::MAX_EXP,
+    core::f64::MIN_EXP
 );

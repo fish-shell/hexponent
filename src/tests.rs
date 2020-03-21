@@ -1,5 +1,4 @@
 use crate::{ConversionResult, FloatLiteral, ParseError};
-use std::ffi;
 
 // This macros serves two functions:
 // 1. It avoids the float_cmp clippy lint
@@ -46,8 +45,11 @@ fn test_float(s: &str, result: f32) {
     let float_result: f32 = float_repr.convert().inner();
     assert_eq_float!(float_result, result);
 
-    let libc_result = string_to_f32(s.as_ref()).unwrap();
-    assert_eq_float!(float_result, libc_result);
+    #[cfg(feature = "std")]
+    {
+        let libc_result = libc_funcs::string_to_f32(s.as_ref()).unwrap();
+        assert_eq_float!(float_result, libc_result);
+    }
 }
 
 fn test_double(s: &str, result: f64) {
@@ -55,8 +57,11 @@ fn test_double(s: &str, result: f64) {
     let double_result: f64 = float_repr.convert().inner();
     assert_eq_double!(double_result, result);
 
-    let libc_result = string_to_f64(s.as_ref()).unwrap();
-    assert_eq_double!(double_result, libc_result);
+    #[cfg(feature = "std")]
+    {
+        let libc_result = libc_funcs::string_to_f64(s.as_ref()).unwrap();
+        assert_eq_double!(double_result, libc_result);
+    }
 }
 
 fn test_both(s: &str, float_result: f32) {
@@ -133,8 +138,8 @@ fn test_exponents() {
 
 #[test]
 fn test_overflow_underflow() {
-    test_float("0x1p1000", std::f32::INFINITY);
-    test_float("-0x1p1000", std::f32::NEG_INFINITY);
+    test_float("0x1p1000", core::f32::INFINITY);
+    test_float("-0x1p1000", core::f32::NEG_INFINITY);
     test_float("0x1p-1000", 0.0);
     test_float("-0x1p-1000", -0.0);
 }
@@ -213,44 +218,48 @@ fn test_imprecise_conversions() {
     test_imprecise("0x1p10000"); // Overflow
 }
 
-// I had both of these functions checked over by jynelson
+#[cfg(feature = "std")]
+mod libc_funcs {
+    use std::ffi;
 
-#[allow(unsafe_code)]
-fn f64_to_string(f: f64) -> Result<Vec<u8>, ()> {
-    let mut dest = [0u8; 32];
-    let format = ffi::CString::new("%a").unwrap();
-    let number = f as libc::c_double;
-    let check =
-        unsafe { libc::snprintf(dest.as_mut_ptr() as *mut i8, 32, format.as_ptr(), number) };
-    if check >= 0 && check < 32 {
-        Ok(dest[..check as usize].to_vec())
-    } else {
-        Err(())
+    // I had both of these functions checked over by jynelson
+    #[allow(unsafe_code)]
+    pub fn f64_to_string(f: f64) -> Result<Vec<u8>, ()> {
+        let mut dest = [0u8; 32];
+        let format = ffi::CString::new("%a").unwrap();
+        let number = f as libc::c_double;
+        let check =
+            unsafe { libc::snprintf(dest.as_mut_ptr() as *mut i8, 32, format.as_ptr(), number) };
+        if check >= 0 && check < 32 {
+            Ok(dest[..check as usize].to_vec())
+        } else {
+            Err(())
+        }
     }
-}
 
-#[allow(unsafe_code)]
-fn string_to_f32(string: &[u8]) -> Result<f32, ()> {
-    let source = ffi::CString::new(string).unwrap();
-    let format = ffi::CString::new("%a").unwrap();
-    let mut dest: f32 = 0.0;
-    let check = unsafe { libc::sscanf(source.as_ptr(), format.as_ptr(), &mut dest) };
-    if check == 1 {
-        Ok(dest)
-    } else {
-        Err(())
+    #[allow(unsafe_code)]
+    pub fn string_to_f32(string: &[u8]) -> Result<f32, ()> {
+        let source = ffi::CString::new(string).unwrap();
+        let format = ffi::CString::new("%a").unwrap();
+        let mut dest: f32 = 0.0;
+        let check = unsafe { libc::sscanf(source.as_ptr(), format.as_ptr(), &mut dest) };
+        if check == 1 {
+            Ok(dest)
+        } else {
+            Err(())
+        }
     }
-}
 
-#[allow(unsafe_code)]
-fn string_to_f64(string: &[u8]) -> Result<f64, ()> {
-    let source = ffi::CString::new(string).unwrap();
-    let format = ffi::CString::new("%la").unwrap();
-    let mut dest: f64 = 0.0;
-    let check = unsafe { libc::sscanf(source.as_ptr(), format.as_ptr(), &mut dest) };
-    if check == 1 {
-        Ok(dest)
-    } else {
-        Err(())
+    #[allow(unsafe_code)]
+    pub fn string_to_f64(string: &[u8]) -> Result<f64, ()> {
+        let source = ffi::CString::new(string).unwrap();
+        let format = ffi::CString::new("%la").unwrap();
+        let mut dest: f64 = 0.0;
+        let check = unsafe { libc::sscanf(source.as_ptr(), format.as_ptr(), &mut dest) };
+        if check == 1 {
+            Ok(dest)
+        } else {
+            Err(())
+        }
     }
 }

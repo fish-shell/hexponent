@@ -1,6 +1,7 @@
 #![deny(unsafe_code)]
 #![deny(missing_docs)]
 #![warn(clippy::dbg_macro)]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 //! # Hexponent
 //!
@@ -24,7 +25,10 @@
 //! - An exponent is not required. (`0x1.2` is allowed)
 //! - `floating-suffix` is *not* parsed. (`0x1p4l` is not allowed)
 
-use std::{fmt, error};
+extern crate alloc;
+
+use alloc::vec::Vec;
+use core::fmt;
 
 mod parse_utils;
 use parse_utils::*;
@@ -89,13 +93,14 @@ impl fmt::Display for ParseError {
     }
 }
 
-impl From<std::num::ParseIntError> for ParseError {
-    fn from(_error: std::num::ParseIntError) -> ParseError {
+impl From<core::num::ParseIntError> for ParseError {
+    fn from(_error: core::num::ParseIntError) -> ParseError {
         ParseError::ExponentOverflow
     }
 }
 
-impl error::Error for ParseError {}
+#[cfg(feature = "std")]
+impl std::error::Error for ParseError {}
 
 /// Represents a floating point literal
 ///
@@ -176,7 +181,7 @@ impl FloatLiteral {
                 // TODO: Maybe make this uft8 conversion unchecked. It should be
                 // good, but I also don't want unsafe code.
                 let exponent: i32 =
-                    std::str::from_utf8(&data[..sign_offset + exponent_digits_offset])
+                    core::str::from_utf8(&data[..sign_offset + exponent_digits_offset])
                         .expect("exponent did not contain valid utf-8")
                         .parse()?;
 
@@ -223,7 +228,7 @@ impl FloatLiteral {
     }
 }
 
-impl std::str::FromStr for FloatLiteral {
+impl core::str::FromStr for FloatLiteral {
     type Err = ParseError;
     fn from_str(s: &str) -> Result<FloatLiteral, ParseError> {
         FloatLiteral::from_bytes(s.as_bytes())
