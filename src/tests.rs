@@ -184,7 +184,7 @@ fn test_incomplete() {
     test_parse_error_kind("0x1p-", ParseErrorKind::MissingExponent);
     test_parse_error_kind("0x1p10000000000", ParseErrorKind::ExponentOverflow);
     test_parse_error_kind("0x1p-10000000000", ParseErrorKind::ExponentOverflow);
-    test_parse_error_kind("0xbaddata", ParseErrorKind::ExtraData);
+    test_parse_error_kind("0xbaddata", ParseErrorKind::MissingEnd);
 }
 
 #[test]
@@ -230,7 +230,7 @@ fn test_error_indecies() {
     test_parse_error("0xb.0p", ParseErrorKind::MissingExponent.at(6));
     test_parse_error("0x1p-", ParseErrorKind::MissingExponent.at(4));
     test_parse_error("0x1p3000000000", ParseErrorKind::ExponentOverflow.at(4));
-    test_parse_error("0x1.g", ParseErrorKind::ExtraData.at(4));
+    test_parse_error("0x1.g", ParseErrorKind::MissingEnd.at(4));
 }
 
 #[cfg(feature = "std")]

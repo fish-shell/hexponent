@@ -81,8 +81,9 @@ impl<T> ConversionResult<T> {
 pub struct ParseError {
     /// Kind of error
     pub kind: ParseErrorKind,
-    /// Approximate index of the error in the source data. This is not
-    /// guarenteed to be accurate.
+    /// Approximate index of the error in the source data. This will always be
+    /// an index to the source, except for when something is expected and
+    /// nothing is found, in this case, index will be the length of the input. 
     pub index: usize,
 }
 
@@ -111,10 +112,10 @@ pub enum ParseErrorKind {
     ///
     /// Example: `0x1p3000000000`
     ExponentOverflow,
-    /// Extra bytes were found at the end of the hexadecimal literal.
+    /// The end of the literal was expected, but more bytes were found.
     ///    
     /// Example: `0x1.g`
-    ExtraData,
+    MissingEnd,
 }
 
 impl ParseErrorKind {
@@ -130,7 +131,7 @@ impl fmt::Display for ParseError {
             ParseErrorKind::MissingDigits => write!(f, "literal must have digits"),
             ParseErrorKind::MissingExponent => write!(f, "exponent not present"),
             ParseErrorKind::ExponentOverflow => write!(f, "exponent too large to fit in integer"),
-            ParseErrorKind::ExtraData => {
+            ParseErrorKind::MissingEnd => {
                 write!(f, "extra bytes were found at the end of float literal")
             }
         }
@@ -243,7 +244,7 @@ impl FloatLiteral {
         };
 
         if !data.is_empty() {
-            return Err(ParseErrorKind::ExtraData.at(get_cursed_index(original_data, data)));
+            return Err(ParseErrorKind::MissingEnd.at(get_cursed_index(original_data, data)));
         }
 
         let mut raw_digits = ipart.to_vec();
