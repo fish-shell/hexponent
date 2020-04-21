@@ -83,7 +83,7 @@ pub struct ParseError {
     pub kind: ParseErrorKind,
     /// Approximate index of the error in the source data. This will always be
     /// an index to the source, except for when something is expected and
-    /// nothing is found, in this case, index will be the length of the input. 
+    /// nothing is found, in this case, `index` will be the length of the input. 
     pub index: usize,
 }
 
