@@ -25,7 +25,7 @@
 //! There are two places where hexponent differs from the C11 specificaiton.
 //! - An exponent is not required. (`0x1.2` is allowed)
 //! - `floating-suffix` is *not* parsed. (`0x1p4l` is not allowed)
-//! 
+//!
 //! ## `no_std` support
 //! `no_std` support can be enabled by disabling the default `std` feature for
 //! hexponent in your `Cargo.toml`.
@@ -71,44 +71,69 @@ impl<T> ConversionResult<T> {
 }
 
 /// Error type for parsing hexadecimal literals.
-/// 
+///
+/// See the [`ParseErrorKind`](enum.ParseErrorKind.html) documentation for more
+/// details about the kinds of errors and examples.
+///
 /// `ParseError` only implements `std::error::Error` when the `std` feature is
 /// enabled.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum ParseError {
+pub struct ParseError {
+    /// Kind of error
+    pub kind: ParseErrorKind,
+    /// Approximate index of the error in the source data. This is not
+    /// guarenteed to be accurate.
+    pub index: usize,
+}
+
+/// Kind of parsing error.
+///
+/// Used in [`ParseError`](struct.ParseError.html)
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ParseErrorKind {
     /// No prefix was found. Hexadecimal literals must start with a "0x" or "0X"
     /// prefix.
+    ///
+    /// Example: `0.F`
     MissingPrefix,
     /// No digits were found. Hexadecimals literals must have digits before or
     /// after the decimal point.
+    ///
+    /// Example: `0x.` `0x.p1`
     MissingDigits,
-    /// Hexadecimal literals with a "p" or "P" to indicate an exponent must have
+    /// Hexadecimal literals with a "p" or "P" to indicate an float must have
     /// an exponent.
+    ///
+    /// Example: `0xb.0p` `0x1p-`
     MissingExponent,
     /// The exponent of a hexidecimal literal must fit into a signed 32-bit
     /// integer.
+    ///
+    /// Example: `0x1p3000000000`
     ExponentOverflow,
     /// Extra bytes were found at the end of the hexadecimal literal.
+    ///    
+    /// Example: `0x1.g`
     ExtraData,
+}
+
+impl ParseErrorKind {
+    fn at(self, index: usize) -> ParseError {
+        ParseError { kind: self, index }
+    }
 }
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ParseError::MissingPrefix => write!(f, "literal must have hex prefix"),
-            ParseError::MissingDigits => write!(f, "literal must have digits"),
-            ParseError::MissingExponent => write!(f, "exponent not present"),
-            ParseError::ExponentOverflow => write!(f, "exponent too large to fit in integer"),
-            ParseError::ExtraData => {
+        match self.kind {
+            ParseErrorKind::MissingPrefix => write!(f, "literal must have hex prefix"),
+            ParseErrorKind::MissingDigits => write!(f, "literal must have digits"),
+            ParseErrorKind::MissingExponent => write!(f, "exponent not present"),
+            ParseErrorKind::ExponentOverflow => write!(f, "exponent too large to fit in integer"),
+            ParseErrorKind::ExtraData => {
                 write!(f, "extra bytes were found at the end of float literal")
             }
         }
-    }
-}
-
-impl From<core::num::ParseIntError> for ParseError {
-    fn from(_error: core::num::ParseIntError) -> ParseError {
-        ParseError::ExponentOverflow
     }
 }
 
@@ -132,6 +157,11 @@ pub struct FloatLiteral {
     exponent: i32,
 }
 
+/// Get the byte index of the start of `sub_slice` in `master_slice`
+fn get_cursed_index(master_slice: &[u8], sub_slice: &[u8]) -> usize {
+    (sub_slice.as_ptr() as usize).saturating_sub(master_slice.as_ptr() as usize)
+}
+
 impl FloatLiteral {
     /// Convert the `self` to an `f32` or `f64` and return the precision of the
     /// conversion.
@@ -144,6 +174,8 @@ impl FloatLiteral {
     /// This is based on hexadecimal floating constants in the C11 specification,
     /// section [6.4.4.2](http://port70.net/~nsz/c/c11/n1570.html#6.4.4.2).
     pub fn from_bytes(data: &[u8]) -> Result<FloatLiteral, ParseError> {
+        let original_data = data;
+
         let (is_positive, data) = match data.get(0) {
             Some(b'+') => (true, &data[1..]),
             Some(b'-') => (false, &data[1..]),
@@ -152,7 +184,7 @@ impl FloatLiteral {
 
         let data = match data.get(0..2) {
             Some(b"0X") | Some(b"0x") => &data[2..],
-            _ => return Err(ParseError::MissingPrefix),
+            _ => return Err(ParseErrorKind::MissingPrefix.at(0)),
         };
 
         let (ipart, data) = consume_hex_digits(data);
@@ -166,7 +198,7 @@ impl FloatLiteral {
 
         // Must have digits before or after the decimal point.
         if fpart.is_empty() && ipart.is_empty() {
-            return Err(ParseError::MissingDigits);
+            return Err(ParseErrorKind::MissingDigits.at(get_cursed_index(original_data, data)));
         }
 
         let (exponent, data) = match data.get(0) {
@@ -187,7 +219,9 @@ impl FloatLiteral {
                     .unwrap_or_else(|| data[sign_offset..].len());
 
                 if exponent_digits_offset == 0 {
-                    return Err(ParseError::MissingExponent);
+                    return Err(
+                        ParseErrorKind::MissingExponent.at(get_cursed_index(original_data, data))
+                    );
                 }
 
                 // The exponent should always contain valid utf-8 beacuse it
@@ -197,7 +231,11 @@ impl FloatLiteral {
                 let exponent: i32 =
                     core::str::from_utf8(&data[..sign_offset + exponent_digits_offset])
                         .expect("exponent did not contain valid utf-8")
-                        .parse()?;
+                        .parse()
+                        .map_err(|_| {
+                            ParseErrorKind::ExponentOverflow
+                                .at(get_cursed_index(original_data, data))
+                        })?;
 
                 (exponent, &data[sign_offset + exponent_digits_offset..])
             }
@@ -205,7 +243,7 @@ impl FloatLiteral {
         };
 
         if !data.is_empty() {
-            return Err(ParseError::ExtraData);
+            return Err(ParseErrorKind::ExtraData.at(get_cursed_index(original_data, data)));
         }
 
         let mut raw_digits = ipart.to_vec();

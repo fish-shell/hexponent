@@ -1,4 +1,4 @@
-use crate::{ConversionResult, FloatLiteral, ParseError};
+use crate::{ConversionResult, FloatLiteral, ParseError, ParseErrorKind};
 
 // This macros serves two functions:
 // 1. It avoids the float_cmp clippy lint
@@ -68,6 +68,10 @@ fn test_both(s: &str, float_result: f32) {
     let double_result = float_result as f64;
     test_float(s, float_result);
     test_double(s, double_result);
+}
+
+fn test_parse_error_kind(s: &str, error: ParseErrorKind) {
+    assert_eq!(s.parse::<FloatLiteral>().unwrap_err().kind, error);
 }
 
 fn test_parse_error(s: &str, error: ParseError) {
@@ -165,22 +169,22 @@ fn rcc_tests() {
 
 #[test]
 fn test_incomplete() {
-    test_parse_error("", ParseError::MissingPrefix);
-    test_parse_error("-", ParseError::MissingPrefix);
-    test_parse_error("+", ParseError::MissingPrefix);
-    test_parse_error("-3.2", ParseError::MissingPrefix);
-    test_parse_error("0x", ParseError::MissingDigits);
-    test_parse_error("-0x", ParseError::MissingDigits);
-    test_parse_error("+0x", ParseError::MissingDigits);
-    test_parse_error("0x.", ParseError::MissingDigits);
-    test_parse_error("0xp", ParseError::MissingDigits);
-    test_parse_error("0x.p1", ParseError::MissingDigits);
-    test_parse_error("0x1p", ParseError::MissingExponent);
-    test_parse_error("0x1p+", ParseError::MissingExponent);
-    test_parse_error("0x1p-", ParseError::MissingExponent);
-    test_parse_error("0x1p10000000000", ParseError::ExponentOverflow);
-    test_parse_error("0x1p-10000000000", ParseError::ExponentOverflow);
-    test_parse_error("0xbaddata", ParseError::ExtraData);
+    test_parse_error_kind("", ParseErrorKind::MissingPrefix);
+    test_parse_error_kind("-", ParseErrorKind::MissingPrefix);
+    test_parse_error_kind("+", ParseErrorKind::MissingPrefix);
+    test_parse_error_kind("-3.2", ParseErrorKind::MissingPrefix);
+    test_parse_error_kind("0x", ParseErrorKind::MissingDigits);
+    test_parse_error_kind("-0x", ParseErrorKind::MissingDigits);
+    test_parse_error_kind("+0x", ParseErrorKind::MissingDigits);
+    test_parse_error_kind("0x.", ParseErrorKind::MissingDigits);
+    test_parse_error_kind("0xp", ParseErrorKind::MissingDigits);
+    test_parse_error_kind("0x.p1", ParseErrorKind::MissingDigits);
+    test_parse_error_kind("0x1p", ParseErrorKind::MissingExponent);
+    test_parse_error_kind("0x1p+", ParseErrorKind::MissingExponent);
+    test_parse_error_kind("0x1p-", ParseErrorKind::MissingExponent);
+    test_parse_error_kind("0x1p10000000000", ParseErrorKind::ExponentOverflow);
+    test_parse_error_kind("0x1p-10000000000", ParseErrorKind::ExponentOverflow);
+    test_parse_error_kind("0xbaddata", ParseErrorKind::ExtraData);
 }
 
 #[test]
@@ -216,6 +220,17 @@ fn test_imprecise_conversions() {
     test_imprecise("0x1p-10000"); // Underflow
     test_imprecise("0x123456789abcdef"); // Truncation
     test_imprecise("0x1p10000"); // Overflow
+}
+
+#[test]
+fn test_error_indecies() {
+    test_parse_error("0.F", ParseErrorKind::MissingPrefix.at(0));
+    test_parse_error("0x.", ParseErrorKind::MissingDigits.at(3));
+    test_parse_error("0x.p1", ParseErrorKind::MissingDigits.at(3));
+    test_parse_error("0xb.0p", ParseErrorKind::MissingExponent.at(6));
+    test_parse_error("0x1p-", ParseErrorKind::MissingExponent.at(4));
+    test_parse_error("0x1p3000000000", ParseErrorKind::ExponentOverflow.at(4));
+    test_parse_error("0x1.g", ParseErrorKind::ExtraData.at(4));
 }
 
 #[cfg(feature = "std")]
