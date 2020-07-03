@@ -35,8 +35,8 @@
 //! ```
 //! `no_std` support is only possible in rustc version 1.36.0 and higher.
 //!
-//! Disabling the `std` feature can currently only disables the
-//! `std::error::Error` implementation for `ParseError`.
+//! Disabling the `std` feature currently only disables the `std::error::Error`
+//! implementation for `ParseError`.
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
