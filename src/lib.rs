@@ -14,12 +14,13 @@
 //! let value = float_repr.convert::<f32>().inner();
 //! assert_eq!(value, 3.25);
 //! ```
+//! Hexponent has a minimum supported rust version of 1.34.
 //!
 //! ## Features
 //! - No dependencies
 //! - Non-UTF-8 parser
 //! - Precision warnings
-//! - `no_std` support
+//! - `no_std` support (MSRV 1.36.0)
 //!
 //! ## Differences from the specification
 //! There are two places where hexponent differs from the C11 specificaiton.
@@ -32,12 +33,17 @@
 //! ```toml
 //! hexponent = {version = "0.2", default-features = false}
 //! ```
+//! `no_std` support is only possible in rustc version 1.36.0 and higher.
+//!
 //! Disabling the `std` feature can currently only disables the
 //! `std::error::Error` implementation for `ParseError`.
 
+#[cfg(not(feature = "std"))]
 extern crate alloc;
 
+#[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
+
 use core::fmt;
 
 mod parse_utils;
@@ -83,7 +89,7 @@ pub struct ParseError {
     pub kind: ParseErrorKind,
     /// Approximate index of the error in the source data. This will always be
     /// an index to the source, except for when something is expected and
-    /// nothing is found, in this case, `index` will be the length of the input. 
+    /// nothing is found, in this case, `index` will be the length of the input.
     pub index: usize,
 }
 
@@ -113,7 +119,7 @@ pub enum ParseErrorKind {
     /// Example: `0x1p3000000000`
     ExponentOverflow,
     /// The end of the literal was expected, but more bytes were found.
-    ///    
+    ///
     /// Example: `0x1.g`
     MissingEnd,
 }
@@ -288,15 +294,15 @@ impl core::str::FromStr for FloatLiteral {
     }
 }
 
-impl Into<f32> for FloatLiteral {
-    fn into(self) -> f32 {
-        self.convert().inner()
+impl From<FloatLiteral> for f32 {
+    fn from(literal: FloatLiteral) -> f32 {
+        literal.convert().inner()
     }
 }
 
-impl Into<f64> for FloatLiteral {
-    fn into(self) -> f64 {
-        self.convert().inner()
+impl From<FloatLiteral> for f64 {
+    fn from(literal: FloatLiteral) -> f64 {
+        literal.convert().inner()
     }
 }
 

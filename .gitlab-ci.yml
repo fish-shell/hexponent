@@ -28,7 +28,7 @@ no-std-test:
 
 backwards-compatibility-test:
   stage: test
-  image: rust:1.37.0
+  image: rust:1.34
   script:
     - cargo test --verbose
     
