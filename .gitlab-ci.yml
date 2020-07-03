@@ -30,8 +30,9 @@ backwards-compatibility-test:
   stage: test
   image: rust:1.34
   script:
-    - cargo clean
-    - cargo test --verbose --tests
+    - cargo test --verbose
+  variables:
+    GIT_STRATEGY: clone
     
 docs:
   stage: deploy
