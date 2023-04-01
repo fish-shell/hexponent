@@ -49,7 +49,7 @@ use core::fmt;
 mod fpformat;
 pub use fpformat::FPFormat;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// Indicates the precision of a conversion
 pub enum ConversionResult<T> {
     /// The conversion was precise and the result represents the original exactly.
@@ -70,6 +70,16 @@ impl<T> ConversionResult<T> {
             ConversionResult::Precise(f) => f,
             ConversionResult::Imprecise(f) => f,
         }
+    }
+
+    /// Return whether this result is precise.
+    pub fn is_precise(&self) -> bool {
+        matches!(self, ConversionResult::Precise(_))
+    }
+
+    /// Return whether this result is imprecise.
+    pub fn is_imprecise(&self) -> bool {
+        matches!(self, ConversionResult::Imprecise(_))
     }
 }
 
@@ -115,10 +125,6 @@ pub enum ParseErrorKind {
     ///
     /// Example: `0x1p3000000000`
     ExponentOverflow,
-    /// The end of the literal was expected, but more bytes were found.
-    ///
-    /// Example: `0x1.g`
-    MissingEnd,
 }
 
 impl ParseErrorKind {
@@ -134,9 +140,6 @@ impl fmt::Display for ParseError {
             ParseErrorKind::MissingDigits => write!(f, "literal must have digits"),
             ParseErrorKind::MissingExponent => write!(f, "exponent not present"),
             ParseErrorKind::ExponentOverflow => write!(f, "exponent too large to fit in integer"),
-            ParseErrorKind::MissingEnd => {
-                write!(f, "extra bytes were found at the end of float literal")
-            }
         }
     }
 }
@@ -212,6 +215,17 @@ impl FloatLiteral {
     /// conversion.
     pub fn convert<F: FPFormat>(self) -> ConversionResult<F> {
         F::from_literal(self)
+    }
+
+    /// Helper used by the tests.
+    #[cfg(test)]
+    pub fn create(is_positive: bool, digits: Vec<u8>, decimal_offset: i32, exponent: i32) -> Self {
+        FloatLiteral {
+            is_positive,
+            digits,
+            decimal_offset,
+            exponent,
+        }
     }
 
     /// Parse a sequence of chars into a `FloatLiteral`.
@@ -301,10 +315,6 @@ impl FloatLiteral {
                 .map_err(|_| ParseErrorKind::ExponentOverflow.at(exponent_start))?;
         }
 
-        if !data.peek().is_none() {
-            return Err(ParseErrorKind::MissingEnd.at(data.consumed));
-        }
-
         let mut raw_digits = ipart;
         raw_digits.extend_from_slice(&fpart);
 
@@ -332,6 +342,19 @@ impl FloatLiteral {
             exponent,
         })
     }
+}
+
+/// Parse a hex float from a sequence of Chars with the given decimal separator.
+/// Return by reference the number of chars consumed.
+pub fn parse_hex_float<Chars>(
+    input: Chars,
+    decimal_sep: char,
+    out_consumed: &mut usize,
+) -> Result<f64, ParseError>
+where
+    Chars: Iterator<Item = char> + Clone,
+{
+    FloatLiteral::from_chars(input, decimal_sep, out_consumed).map(|f| f.convert().inner())
 }
 
 impl core::str::FromStr for FloatLiteral {

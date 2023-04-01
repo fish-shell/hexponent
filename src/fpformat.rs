@@ -16,9 +16,13 @@ macro_rules! impl_fpformat {
                 // 4 bits for each hexadecimal offset
                 let mut exponent_offset: i32 = literal.decimal_offset * 4;
 
-                // If there were all
+                // If there were all 0s, return 0 or -0.
                 if literal.digits.is_empty() {
-                    return ConversionResult::Precise(0.0);
+                    if literal.is_positive {
+                        return ConversionResult::Precise(0.0);
+                    } else {
+                        return ConversionResult::Precise(-0.0);
+                    };
                 }
 
                 // This code is a work of art.
