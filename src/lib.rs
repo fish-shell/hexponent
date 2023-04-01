@@ -46,14 +46,11 @@ use alloc::vec::Vec;
 
 use core::fmt;
 
-mod parse_utils;
-use parse_utils::*;
-
 mod fpformat;
 pub use fpformat::FPFormat;
 
 #[derive(Debug)]
-/// Indicates the preicsision of a conversion
+/// Indicates the precision of a conversion
 pub enum ConversionResult<T> {
     /// The conversion was precise and the result represents the original exactly.
     Precise(T),
@@ -148,6 +145,52 @@ impl fmt::Display for ParseError {
 /// Only available with the `std` feature.
 impl std::error::Error for ParseError {}
 
+use std::iter::{Fuse, Peekable};
+
+/// An iterator that counts the number of chars consumed.
+pub struct CharsIterator<Chars>
+where
+    Chars: Iterator<Item = char>,
+{
+    chars: Peekable<Fuse<Chars>>,
+    consumed: usize,
+}
+
+impl<Chars> CharsIterator<Chars>
+where
+    Chars: Iterator<Item = char>,
+{
+    /// Get the current char, or \0.
+    fn current(&mut self) -> char {
+        self.peek().unwrap_or('\0')
+    }
+
+    /// Get the current char, or None.
+    fn peek(&mut self) -> Option<char> {
+        self.chars.peek().copied()
+    }
+
+    /// Get the next char, incrementing self.consumed.
+    fn next(&mut self) -> Option<char> {
+        let res = self.chars.next();
+        if res.is_some() {
+            self.consumed += 1;
+        }
+        res
+    }
+
+    /// Consume a sequence of hex digits and return it as a sequence of u8s.
+    /// The returned values are integers, not ascii characters.
+    fn consume_hex_digits(&mut self) -> Vec<u8> {
+        let mut digits = Vec::new();
+        while let Some(digit) = self.peek().and_then(|c| c.to_digit(16)) {
+            digits.push(digit as u8);
+            self.next();
+        }
+        digits
+    }
+}
+
 /// Represents a floating point literal
 ///
 /// This struct is a representation of the text, that can be used to convert to
@@ -164,11 +207,6 @@ pub struct FloatLiteral {
     exponent: i32,
 }
 
-/// Get the byte index of the start of `sub_slice` in `master_slice`
-fn get_cursed_index(master_slice: &[u8], sub_slice: &[u8]) -> usize {
-    (sub_slice.as_ptr() as usize).saturating_sub(master_slice.as_ptr() as usize)
-}
-
 impl FloatLiteral {
     /// Convert the `self` to an `f32` or `f64` and return the precision of the
     /// conversion.
@@ -176,108 +214,117 @@ impl FloatLiteral {
         F::from_literal(self)
     }
 
-    /// Parse a slice of bytes into a `FloatLiteral`.
+    /// Parse a sequence of chars into a `FloatLiteral`.
     ///
     /// This is based on hexadecimal floating constants in the C11 specification,
     /// section [6.4.4.2](http://port70.net/~nsz/c/c11/n1570.html#6.4.4.2).
-    pub fn from_bytes(data: &[u8]) -> Result<FloatLiteral, ParseError> {
-        let original_data = data;
-
-        let (is_positive, data) = match data.get(0) {
-            Some(b'+') => (true, &data[1..]),
-            Some(b'-') => (false, &data[1..]),
-            _ => (true, data),
+    pub fn from_chars<Chars>(
+        input: Chars,
+        decimal_sep: char,
+        out_consumed: &mut usize,
+    ) -> Result<FloatLiteral, ParseError>
+    where
+        Chars: Iterator<Item = char> + Clone,
+    {
+        let mut data = CharsIterator {
+            chars: input.fuse().peekable(),
+            consumed: 0,
         };
 
-        let data = match data.get(0..2) {
-            Some(b"0X") | Some(b"0x") => &data[2..],
-            _ => return Err(ParseErrorKind::MissingPrefix.at(0)),
+        let is_positive = match data.peek() {
+            Some('+') => {
+                data.next();
+                true
+            }
+            Some('-') => {
+                data.next();
+                false
+            }
+            _ => true,
         };
 
-        let (ipart, data) = consume_hex_digits(data);
+        // Parse 0x or 0X prefix.
+        let prefix_start = data.consumed;
+        if data.current() != '0' {
+            return Err(ParseErrorKind::MissingPrefix.at(prefix_start));
+        }
+        data.next();
+        if data.current() != 'x' && data.current() != 'X' {
+            return Err(ParseErrorKind::MissingPrefix.at(prefix_start));
+        }
+        data.next();
 
-        let (fpart, data): (&[_], _) = if data.get(0) == Some(&b'.') {
-            let (fpart, data) = consume_hex_digits(&data[1..]);
-            (fpart, data)
+        let ipart: Vec<u8> = data.consume_hex_digits();
+        let ipart_len = ipart.len();
+
+        let fpart: Vec<u8>;
+        if data.current() == decimal_sep {
+            data.next();
+            fpart = data.consume_hex_digits();
         } else {
-            (b"", data)
-        };
+            fpart = Vec::new();
+        }
 
         // Must have digits before or after the decimal point.
         if fpart.is_empty() && ipart.is_empty() {
-            return Err(ParseErrorKind::MissingDigits.at(get_cursed_index(original_data, data)));
+            return Err(ParseErrorKind::MissingDigits.at(data.consumed));
         }
 
-        let (exponent, data) = match data.get(0) {
-            Some(b'P') | Some(b'p') => {
-                let data = &data[1..];
+        let mut exponent = 0;
+        if data.current() == 'p' || data.current() == 'P' {
+            data.next();
 
-                let sign_offset = match data.get(0) {
-                    Some(b'+') | Some(b'-') => 1,
-                    _ => 0,
-                };
-
-                let exponent_digits_offset = data[sign_offset..]
-                    .iter()
-                    .position(|&b| match b {
-                        b'0'..=b'9' => false,
-                        _ => true,
-                    })
-                    .unwrap_or_else(|| data[sign_offset..].len());
-
-                if exponent_digits_offset == 0 {
-                    return Err(
-                        ParseErrorKind::MissingExponent.at(get_cursed_index(original_data, data))
-                    );
+            let exponent_start = data.consumed;
+            let mut exponent_str = String::new();
+            match data.current() {
+                '+' => {
+                    data.next();
                 }
+                '-' => {
+                    data.next();
+                    exponent_str.push('-');
+                }
+                _ => {}
+            };
 
-                // The exponent should always contain valid utf-8 beacuse it
-                // consumes a sign, and base-10 digits.
-                // TODO: Maybe make this uft8 conversion unchecked. It should be
-                // good, but I also don't want unsafe code.
-                let exponent: i32 =
-                    core::str::from_utf8(&data[..sign_offset + exponent_digits_offset])
-                        .expect("exponent did not contain valid utf-8")
-                        .parse()
-                        .map_err(|_| {
-                            ParseErrorKind::ExponentOverflow
-                                .at(get_cursed_index(original_data, data))
-                        })?;
-
-                (exponent, &data[sign_offset + exponent_digits_offset..])
+            // Collect the exponent into a string, optionally with a sign, and then use Rust's parsing.
+            while data.current().is_digit(10) {
+                exponent_str.push(data.next().unwrap());
             }
-            _ => (0, data),
-        };
 
-        if !data.is_empty() {
-            return Err(ParseErrorKind::MissingEnd.at(get_cursed_index(original_data, data)));
+            if exponent_str.is_empty() || exponent_str == "-" {
+                return Err(ParseErrorKind::MissingExponent.at(exponent_start));
+            }
+
+            exponent = exponent_str
+                .parse()
+                .map_err(|_| ParseErrorKind::ExponentOverflow.at(exponent_start))?;
         }
 
-        let mut raw_digits = ipart.to_vec();
-        raw_digits.extend_from_slice(fpart);
+        if !data.peek().is_none() {
+            return Err(ParseErrorKind::MissingEnd.at(data.consumed));
+        }
 
-        let first_digit = raw_digits.iter().position(|&d| d != b'0');
+        let mut raw_digits = ipart;
+        raw_digits.extend_from_slice(&fpart);
 
+        let first_digit = raw_digits.iter().position(|&d| d != 0);
         let (digits, decimal_offset) = if let Some(first_digit) = first_digit {
             // Unwrap is safe because there is at least one digit.
-            let last_digit = raw_digits.iter().rposition(|&d| d != b'0').unwrap();
-            let decimal_offset = (ipart.len() as i32) - (first_digit as i32);
+            let last_digit = raw_digits.iter().rposition(|&d| d != 0).unwrap();
+            let decimal_offset = (ipart_len as i32) - (first_digit as i32);
 
             // Trim off the leading zeros
             raw_digits.truncate(last_digit + 1);
             // Trim off the trailing zeros
             raw_digits.drain(..first_digit);
 
-            // Convert all the digits from ascii to their values.
-            for item in raw_digits.iter_mut() {
-                *item = hex_digit_to_int(*item).unwrap();
-            }
-
             (raw_digits, decimal_offset)
         } else {
             (Vec::new(), 0)
         };
 
+        *out_consumed = data.consumed;
         Ok(FloatLiteral {
             is_positive,
             digits,
@@ -290,7 +337,7 @@ impl FloatLiteral {
 impl core::str::FromStr for FloatLiteral {
     type Err = ParseError;
     fn from_str(s: &str) -> Result<FloatLiteral, ParseError> {
-        FloatLiteral::from_bytes(s.as_bytes())
+        FloatLiteral::from_chars(s.chars(), '.', &mut 0)
     }
 }
 
