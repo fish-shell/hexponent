@@ -271,13 +271,12 @@ impl FloatLiteral {
         let ipart: Vec<u8> = data.consume_hex_digits();
         let ipart_len = ipart.len();
 
-        let fpart: Vec<u8>;
-        if data.current() == decimal_sep {
+        let fpart: Vec<u8> = if data.current() == decimal_sep {
             data.next();
-            fpart = data.consume_hex_digits();
+            data.consume_hex_digits()
         } else {
-            fpart = Vec::new();
-        }
+            Vec::new()
+        };
 
         // Must have digits before or after the decimal point.
         if fpart.is_empty() && ipart.is_empty() {
@@ -302,7 +301,7 @@ impl FloatLiteral {
             };
 
             // Collect the exponent into a string, optionally with a sign, and then use Rust's parsing.
-            while data.current().is_digit(10) {
+            while data.current().is_ascii_digit() {
                 exponent_str.push(data.next().unwrap());
             }
 
